@@ -1,0 +1,29 @@
+{ "Properties":
+  { "node_properties": [
+      { "name":"Threshold", "type":73, "index":0, "size":1, "min_value":-127.0, "max_value":127.0 }],
+    "edge_properties": [
+      { "name":"Delay", "type":73, "index":1, "size":1, "min_value":1.0, "max_value":7.0 },
+      { "name":"Weight", "type":73, "index":0, "size":1, "min_value":-127.0, "max_value":127.0 }],
+    "network_properties": [] },
+ "Nodes":
+  [ {"id":0,"values":[9.0]},
+    {"id":1,"values":[5.0]} ],
+ "Edges":
+  [ {"from":0,"to":1,"values":[2.0,3.0]} ],
+ "Inputs": [0],
+ "Outputs": [1],
+ "Network_Values": [],
+ "Associated_Data":
+   { "other": {"proc_name":"risp"},
+     "proc_params": 
+      { "discrete": true,
+        "fire_like_ravens": false,
+        "leak_mode": "none",
+        "max_delay": 7,
+        "max_threshold": 127.0,
+        "max_weight": 127.0,
+        "min_threshold": -127.0,
+        "min_weight": -127.0,
+        "non_negative_charge": false,
+        "run_time_inclusive": false,
+        "threshold_inclusive": true}}}

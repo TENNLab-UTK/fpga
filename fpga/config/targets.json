@@ -1,0 +1,28 @@
+{
+    "basys3": {
+        "default_tool": "vivado",
+        "parameters": {
+            "clk_freq": 100000000.0,
+            "uart": {
+                "baud_rates": [
+                    115200,
+                    230400,
+                    460800,
+                    576000,
+                    921600,
+                    1000000,
+                    1500000,
+                    2000000,
+                    3000000,
+                    4000000
+                ]
+            }
+        },
+        "tools": {
+            "vivado": {
+                "part": "xc7a35tcpg236-1",
+                "pgm": "vivado"
+            }
+        }
+    }
+}

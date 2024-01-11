@@ -1,0 +1,15 @@
+{
+    "folders": [
+        {
+            "path": "."
+        },
+        {
+            "path": ".."
+        }
+    ],
+    "settings": {
+        "licenser.license": "MPLv2",
+        "licenser.projectName": "Neuromorphic FPGA",
+        "licenser.useSPDXLicenseFormat": false,
+    }
+}

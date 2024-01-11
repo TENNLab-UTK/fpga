@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch]
+version.source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fpga"]
+
+[project]
+dynamic = ["version"]
+name = "neuro_fpga"
+description = "Neuromorphic FPGA"
+readme = "README.md"
+license.file = "LICENSE"
+authors = [
+    { name = "Keegan Dent", email = "keegandent@gmail.com" },
+]
+maintainers = [
+    { name = "Keegan Dent", email = "keegandent@gmail.com" },
+]
+
+classifiers = [
+    "Private :: Do Not Upload",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Hardware",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3 :: Only",
+]
+
+requires-python = ">=3.9"
+dependencies = [
+    "bitstruct",
+    "edalize",
+    "framework",
+    "numpy",
+    "platformdirs",
+    "python-periphery",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+test = [
+    "cocotb",
+    "cocotb-test",
+]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+]
+
+[project.urls]
+"Homepage" = "https://gitlab.com/keegandent/neuro_fpga/"
+"Bug Tracker" = "https://gitlab.com/keegandent/neuro_fpga/issues"
+

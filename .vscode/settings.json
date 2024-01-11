@@ -1,0 +1,22 @@
+{
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+    "flake8.args": [
+        "--extend-ignore=E203,F541",
+        "--max-line-length=88"
+    ],
+    "isort.args": [
+        "--profile=black"
+    ],
+    "isort.check": true,
+    "licenser.license": "MPLv2",
+    "licenser.projectName": "Neuromorphic FPGA",
+    "licenser.useSPDXLicenseFormat": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false
+}

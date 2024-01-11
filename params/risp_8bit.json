@@ -1,0 +1,13 @@
+{
+    "discrete": true,
+    "fire_like_ravens": false,
+    "leak_mode": "none",
+    "max_delay": 7,
+    "max_threshold": 127,
+    "max_weight": 127,
+    "min_threshold": -127,
+    "min_weight": -127,
+    "non_negative_charge": false,
+    "run_time_inclusive": false,
+    "threshold_inclusive": true
+}
