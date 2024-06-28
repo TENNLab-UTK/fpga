@@ -30,18 +30,21 @@ module network_sink (
     // sink output
     output logic [SNK_WIDTH-1:0] snk
 );
+    logic [NET_NUM_OUT-1:0] fires;
 
-    // the snk_queue is a little bit complicated it holds:
-    // 1. the indices of the net outputs that fired in descending order
-    // 2. the number of net outputs that fired
-    // of these, 2 is always populated, and the queue is sent out back-to-front
-    logic [SNK_WIDTH-1:0] snk_queue [0:(NET_NUM_OUT)];   // not -1 because of num_out
+    always_ff @(posedge clk or negedge arstn) begin: set_fires
+        if (arstn == 0) begin
+            fires <= 0;
+        end else if (net_valid && net_ready) begin
+            fires <= net_out;
+        end
+    end
 
     logic [$clog2(NET_NUM_OUT + 2)-1:0] snk_counter, pop_counter;
     assign snk_valid = (pop_counter == 0) && (snk_counter > 0);
     assign net_ready = (pop_counter == 0) && (snk_counter == 0);
 
-    logic pop_fire = net_out[NET_NUM_OUT + 1 - pop_counter];
+    logic pop_fire = fires[NET_NUM_OUT + 1 - pop_counter];
 
     always_ff @(posedge clk or negedge arstn) begin: set_pop_counter
         if (arstn == 0) begin
@@ -55,19 +58,25 @@ module network_sink (
         end
     end
 
-    always_ff @(posedge clk or negedge arstn) begin: set_snk_queue
+    // the snk_stack is a little bit complicated it holds:
+    // 1. the indices of the net outputs that fired in descending order
+    // 2. the number of net outputs that fired
+    // of these, 2 is always populated
+    logic [SNK_WIDTH-1:0] snk_stack [0:(NET_NUM_OUT)];   // not -1 because of num_out
+
+    always_ff @(posedge clk or negedge arstn) begin: set_snk_stack
         if (arstn == 0) begin
-            foreach (snk_queue[i])
-                snk_queue[i] <= 0;
+            foreach (snk_stack[i])
+                snk_stack[i] <= 0;
         end else begin
             if (net_valid && net_ready) begin
-                foreach (snk_queue[i])
-                    snk_queue[i] <= 0;
+                foreach (snk_stack[i])
+                    snk_stack[i] <= 0;
             end else if (pop_counter > 0) begin
                 if (pop_counter == 1) begin
-                    snk_queue[snk_counter] <= snk_counter;
+                    snk_stack[snk_counter] <= snk_counter;
                 end else if (pop_fire) begin
-                    snk_queue[snk_counter] <= NET_NUM_OUT + 1 - pop_counter;
+                    snk_stack[snk_counter] <= NET_NUM_OUT + 1 - pop_counter;
                 end
             end
         end
@@ -77,14 +86,16 @@ module network_sink (
         if (arstn == 0) begin
             snk_counter <= 0;
         end else begin
-            if (pop_fire && (pop_counter > 1)) begin
+            if (pop_counter > 0 && ((pop_counter == 1) || pop_fire)) begin
+                // an entry was pushed onto the snk_stack
                 snk_counter <= snk_counter + 1;
             end esle if (snk_valid && snk_ready) begin
+                // an entry was popped from the snk_stack
                 snk_counter <= snk_counter - 1;
             end
         end
     end
 
-    assign snk = snk_queue[snk_counter - 1];
+    assign snk = snk_stack[snk_counter - 1];
 
 endmodule
