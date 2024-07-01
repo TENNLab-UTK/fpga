@@ -21,7 +21,6 @@ FPGA neuromorphic elements, networks, processors, tooling, and software interfac
 
 - [About](#about)
 - [Getting Started](#getting_started)
-- [Deployment](#deployment)
 - [Usage](#usage)
 - [Built Using](#built_using)
 - [Authors](#authors)
@@ -34,15 +33,15 @@ This project is aimed at providing a simple and minimalist—but highly scalable
 ### Why?
 
 The reasoning for this repository may seem unclear at first. TENNLab already maintains multiple neuroprocessors in HDL and more in simulation.
-However, these approaches are optimized for ASIC implementation and thus incorporate the following primary drawbacks when implemented on FPGAs.
+However, those approaches are optimized for ASIC implementation and thus incorporate the following primary drawbacks when implemented on FPGAs.
 
 1. They cannot take advantage of the "FP" aspects of FPGAs. ASIC neuroprocessors must accomodate dynamic network sizes and topologies at **run-time**. This significantly increases the complexity and overhead of those designs.
-1. ASICs have more granular logic building blocks and designs targeting them are not optimized for FPGA logic elements (LEs). This often means that the designs have slower timing and more LE usage on FPGAs than in targeted implementations.
+1. ASICs have more granular logic building blocks, and designs targeting them are not optimized for FPGA logic elements (LEs). This often means that the designs have slower timing and more LE usage on FPGAs than in targeted implementations.
 
 The ground-up FPGA implementation of neuromorphic networks and processors in this project allows for efficient utilization of hardware resources and communication bandwidth. A particular focus of this project is the "directive" versus "stream" spike processing which allows users to select the bandwidth usage paradigm that best suits their applications. This implementation does, however, have its own drawbacks compared to the ASIC design.
 
-1. Relying on the EDA toolchain to map networks onto the FPGA means that it becomes a bottleneck for HWIL network training. As such, this is not a recommended application for neuromorphic computing compared to training in simulations or on ASIC implementations.
-1. Dynamic network interchanges require either writing a new bitstream (time sacrifice) or increasing utilization to host multiple networks in fabric at once (area sacrifice). However, considering just how resource-efficient the neuromorphic networks in this implementation are, it may still outperform the ASIC implementation when hosting multiple networks in fabric.
+1. Relying on the EDA toolchain to map networks onto the FPGA means that it becomes a bottleneck for HWIL network training. As such, training is not a recommended application for this extension to the neuromorphic computing framework, compared to training in simulations or on ASIC implementations.
+1. Dynamic network interchanges require either writing a new bitstream (time sacrifice) or increasing utilization to host multiple networks in fabric at once (area sacrifice). However, considering how resource-efficient the neuromorphic networks in this implementation are, this implementation may still outperform the ASIC designs when hosting multiple networks in fabric.
 
 ### License
 
@@ -174,7 +173,7 @@ See also the list of [contributors](https://github.com/TENNLab-UTK/fpga/graphs/c
 
 ## 🎉 Acknowledgements <a name = "acknowledgement"></a>
 
-- [UTK TENNLab](https://neuromorphic.eecs.utk.edu) for the top-level API and funamental neromorphic processing behavior.
+- [UTK TENNLab](https://neuromorphic.eecs.utk.edu) researchers for the top-level API and funamental neromorphic processing behavior, including but not limited to:
     - Dr. James Plank
     - Dr. Catherine Schuman
     - Dr. Garrett Rose
