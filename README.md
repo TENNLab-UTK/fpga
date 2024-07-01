@@ -10,7 +10,7 @@
 
 # Neuromorphic FPGA
 
-[![Status](https://img.shields.io/badge/status-active-success.svg)](https://gitlab.com/keegandent/neuro_fpga/-/graphs/main?ref_type=heads)
+[![Status](https://img.shields.io/badge/status-active-success.svg)](https://github.com/TENNLab-UTK/fpga/graphs/code-frequency)
 [![Software License](https://img.shields.io/badge/software_license-MPL--2.0-red.svg)](/LICENSE)
 [![Hardware License](https://img.shields.io/badge/hardware_license-CERN--OHL--W--2.0-blue.svg)](/fpga/rtl/LICENSE)
 
@@ -30,7 +30,6 @@ FPGA neuromorphic elements, networks, processors, tooling, and software interfac
 ## 🧐 About <a name = "about"></a>
 
 This project is aimed at providing a simple and minimalist—but highly scalable—Field-Programmable Gate Array implementation of neuromorphic computing defined by Univeristy of Tennesse Knoxville (UTK) TENNLab research.
-To date it is a personal hobby project of mine, partially for self-instruction in SystemVerilog hardware description language (HDL). It is in no way endorsed by UTK TENNLab nor by my employer.
 
 ### Why?
 
@@ -40,14 +39,14 @@ However, these approaches are optimized for ASIC implementation and thus incorpo
 1. They cannot take advantage of the "FP" aspects of FPGAs. ASIC neuroprocessors must accomodate dynamic network sizes and topologies at **run-time**. This significantly increases the complexity and overhead of those designs.
 1. ASICs have more granular logic building blocks and designs targeting them are not optimized for FPGA logic elements (LEs). This often means that the designs have slower timing and more LE usage on FPGAs than in targeted implementations.
 
-The ground-up FPGA implementation of neuromorphic networks and processors in this project allows for efficient utilization of hardware resources and communication bandwidth. It does however, have its own drawbacks compared to the ASIC design.
+The ground-up FPGA implementation of neuromorphic networks and processors in this project allows for efficient utilization of hardware resources and communication bandwidth. A particular focus of this project is the "directive" versus "stream" spike processing which allows users to select the bandwidth usage paradigm that best suits their applications. This implementation does, however, have its own drawbacks compared to the ASIC design.
 
 1. Relying on the EDA toolchain to map networks onto the FPGA means that it becomes a bottleneck for HWIL network training. As such, this is not a recommended application for neuromorphic computing compared to training in simulations or on ASIC implementations.
 1. Dynamic network interchanges require either writing a new bitstream (time sacrifice) or increasing utilization to host multiple networks in fabric at once (area sacrifice). However, considering just how resource-efficient the neuromorphic networks in this implementation are, it may still outperform the ASIC implementation when hosting multiple networks in fabric.
 
 ### License
 
-The licenses for both hardware and software are **weakly reciprocal**, meaning users of this project need not distribute their larger works under the same license, but the full source, **incuding modifications**, of the files included in this repository must be made available.
+The licenses for both hardware and software are **weakly reciprocal**, meaning users of this project need not distribute their larger works under the same license, but the full source, **incuding modifications**, of the code included in this repository must be made available according to the license terms described below.
 
 #### Software
 
@@ -101,7 +100,7 @@ pip install -e .
 Clone this repository into the requisite location (tentatively `./fpga`).
 
 ```bash
-git clone git@gitlab.com:keegandent/neuro_fpga ./fpga
+git clone git@github.com:TENNLab-UTK/fpga.git ./fpga
 cd fpga
 ```
 
@@ -160,6 +159,8 @@ proc.run(6)
 proc.output_last_fire(0)
 ```
 
+Support for additional FPGA targets can be accomplished by adding entries to the [targets config file](fpga/config/targets.json) and an accompanying folder containing relevant files, e.g. the top-level module and contraints files.
+
 ## ⛏️ Built Using <a name = "built_using"></a>
 
 - [cocotb](https://www.cocotb.org) - HDL Testbench Framework
@@ -167,11 +168,17 @@ proc.output_last_fire(0)
 
 ## ✍️ Authors <a name = "authors"></a>
 
-- [@keegandent](https://gitlab.com/keegandent) - Idea & Initial work
+- [@keegandent](https://github.com/keegandent) - Idea & initial work
 
-See also the list of [contributors](https://gitlab.com/keegandent/neuro_fpga/-/graphs/main) who participated in this project.
+See also the list of [contributors](https://github.com/TENNLab-UTK/fpga/graphs/contributors) who participated in this project.
 
 ## 🎉 Acknowledgements <a name = "acknowledgement"></a>
 
+- [UTK TENNLab](https://neuromorphic.eecs.utk.edu) for the top-level API and funamental neromorphic processing behavior.
+    - Dr. James Plank
+    - Dr. Catherine Schuman
+    - Dr. Garrett Rose
+    - Dr. Charles Rizzo
+    - Bryson Gullett
 - [@alexforencich](https://github.com/alexforencich) for great examples of designs using using cocotb as well as various AXI4-Stream components modified for use in this project
 - [@WillGreen](https://github.com/WillGreen) for his amazing tutorials on [projectf.io](https://projectf.io/tutorials/)
