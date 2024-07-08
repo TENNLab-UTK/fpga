@@ -89,7 +89,7 @@ module network_sink (
             if (pop_counter > 0 && ((pop_counter == 1) || pop_fire)) begin
                 // an entry was pushed onto the snk_stack
                 snk_counter <= snk_counter + 1;
-            end esle if (snk_valid && snk_ready) begin
+            end else if (snk_valid && snk_ready) begin
                 // an entry was popped from the snk_stack
                 snk_counter <= snk_counter - 1;
             end
