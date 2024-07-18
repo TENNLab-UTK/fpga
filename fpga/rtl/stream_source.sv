@@ -52,7 +52,9 @@ module network_source #(
         end
     end
 
-    logic net_en = src_valid && net_ready;
+    logic net_en;
+    assign net_en = src_valid && net_ready;
+
     logic was_ready;
 
     always_ff @(posedge clk or negedge arstn) begin: set_was_ready

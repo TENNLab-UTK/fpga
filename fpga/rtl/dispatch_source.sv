@@ -77,8 +77,8 @@ module network_source #(
     else
         assign inp_idx = src[(`SRC_WIDTH - OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
 
-    logic signed [NET_CHARGE_WIDTH-1:0] inp_val
-        = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
+    logic signed [NET_CHARGE_WIDTH-1:0] inp_val;
+    assign inp_val = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
 
     always_ff @(posedge clk or negedge arstn) begin: set_net_inp
         if (arstn == 0 || op == CLR) begin

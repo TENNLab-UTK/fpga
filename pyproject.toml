@@ -45,7 +45,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "cocotb",
+    "cocotb ~= 1.8.0",
     "cocotb-test",
 ]
 dev = [
