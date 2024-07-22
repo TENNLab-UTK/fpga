@@ -40,6 +40,7 @@ dependencies = [
     "numpy",
     "platformdirs",
     "python-periphery",
+    "dash",
     "tqdm",
 ]
 
