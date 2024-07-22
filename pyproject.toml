@@ -35,12 +35,13 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "bitstruct",
+    "dash",
+    "dash-bootstrap-components",
     "edalize",
     "framework",
     "numpy",
     "platformdirs",
     "python-periphery",
-    "dash",
     "tqdm",
 ]
 
