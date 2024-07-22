@@ -4,8 +4,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import base64
-from gc import disable
-from hmac import new
 
 from dash import Dash, Input, Output, State, callback, dcc, html
 from neuro import Network
