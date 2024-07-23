@@ -67,7 +67,7 @@ The TENNLab Neuromorphic Framework only works on Unix-like systems. Vivado only 
 
 Install any simulators you wish to use which are [compatible with cocotb](https://docs.cocotb.org/en/stable/simulator_support.html).
 
-**NOTE:** This project uses valid SystemVerilog that is currently incompatible with Icarus (iverilog). As a consequence, we are currently only running testbenches with Verilator. Even there, compatibility between the simulator and cocotb can be fragile, so we are currently using v5.006.
+**NOTE:** This project uses valid SystemVerilog that is currently incompatible with Icarus (iverilog). As a consequence, we are currently only running testbenches with Verilator. Even there, compatibility between the simulator and cocotb can be fragile, so we are currently using v5.024.
 
 If you wish to see waveform outputs from the sims, install gtkwave.
 
