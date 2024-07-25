@@ -10,7 +10,7 @@ from enum import Enum, IntEnum, auto
 from heapq import heapify, heappop, heappush, merge
 from importlib import resources
 from json import load
-from math import ceil, inf, log2
+from math import inf
 from typing import Iterable
 
 import bitstruct as bs
@@ -20,26 +20,11 @@ from periphery import Serial
 
 import fpga
 from fpga import config, rtl
+from fpga._math import clog2, width_bits_to_bytes, width_nearest_byte
 from fpga.network import HASH_LEN, build_network_sv, charge_width, hash_network
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
-
-
-def _clog2(count: int) -> int:
-    return int(ceil(log2(count)))
-
-
-def _width_bits_to_bytes(bits: int) -> int:
-    return int(ceil(bits / 8))
-
-
-def _width_bytes_to_bits(bytes: int) -> int:
-    return int(bytes * 8)
-
-
-def _width_nearest_byte(bits: int) -> int:
-    return _width_bytes_to_bits(_width_bits_to_bytes(bits))
 
 
 # we're hacking Spike to support comparison
@@ -66,21 +51,37 @@ class _InpQueue(list):
         return heappop(self)
 
 
-class _IoType(Enum):
+class IoType(Enum):
     DISPATCH = auto()
     STREAM = auto()
 
 
-class _DispatchOpcode(IntEnum):
+class DispatchOpcode(IntEnum):
     NOP = 0
     RUN = auto()
     SPK = auto()
     CLR = auto()
 
 
-class _StreamOpcode(IntEnum):
+class StreamOpcode(IntEnum):
     NOM = 0
     CLR = auto()
+
+
+def opcode_width(opcode_type: type) -> int:
+    return clog2(len(opcode_type))
+
+
+def dispatch_operand_widths(
+    net_num_inp: int, net_charge_width: int, is_axi: bool = True
+) -> tuple[int, int]:
+    opc_width = opcode_width(DispatchOpcode)
+    idx_width = clog2(net_num_inp)
+    spk_width = idx_width + net_charge_width
+    operand_width = (
+        width_nearest_byte(opc_width + spk_width) - opc_width if is_axi else spk_width
+    )
+    return idx_width, operand_width
 
 
 class Processor(neuro.Processor):
@@ -113,23 +114,23 @@ class Processor(neuro.Processor):
         self._io_type = io_type.upper()
         match self._io_type[:2]:
             case "DI":
-                self._inp_type = _IoType.DISPATCH
-                self._Opcode = _DispatchOpcode
+                self._inp_type = IoType.DISPATCH
+                self._Opcode = DispatchOpcode
             case "SI":
-                self._inp_type = _IoType.STREAM
-                self._Opcode = _StreamOpcode
+                self._inp_type = IoType.STREAM
+                self._Opcode = StreamOpcode
             case _:
                 raise ValueError(
                     f"Invalid input type: {io_type.upper()[:2]}I\nExpected: (D|S)I"
                 )
         match self._io_type[2:]:
             case "DO":
-                self._out_type = _IoType.DISPATCH
+                self._out_type = IoType.DISPATCH
                 raise NotImplementedError(
                     "Dispatch output is currently malfunctioning."
                 )
             case "SO":
-                self._out_type = _IoType.STREAM
+                self._out_type = IoType.STREAM
             case _:
                 raise ValueError(
                     f"Invalid output type: {io_type.upper()[2:]}O\nExpected: (D|S)O"
@@ -141,7 +142,7 @@ class Processor(neuro.Processor):
         self._inp_queue.extend(spikes)
         if any(s.time < self._hw_time for s in spikes):
             raise RuntimeError("Spikes cannot be scheduled in the past.")
-        if self._inp_type == _IoType.DISPATCH:
+        if self._inp_type == IoType.DISPATCH:
             spikes_now = []
             while self._inp_queue and self._inp_queue[0].time == self._hw_time:
                 # send these spikes as soon as they arrive to reduce latency
@@ -159,7 +160,7 @@ class Processor(neuro.Processor):
             self._out_queue.update(
                 {out_idx: [] for out_idx in range(self._network.num_outputs())}
             )
-            if self._inp_type == _IoType.DISPATCH:
+            if self._inp_type == IoType.DISPATCH:
                 self._interface.write(
                     self._cmd_fmt.pack({"opcode": self._Opcode.CLR, "operand": 0})[::-1]
                 )
@@ -214,13 +215,13 @@ class Processor(neuro.Processor):
 
     def _hw_rx(self, runs: int) -> None:
         self._interface.flush()
-        num_rx_bytes = _width_bits_to_bytes(self._out_fmt.calcsize())
+        num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
         num_tr_bytes = (
             num_rx_bytes
-            + _width_bits_to_bytes(self._spk_fmt.calcsize())
+            + width_bits_to_bytes(self._spk_fmt.calcsize())
             + (
-                _width_bits_to_bytes(self._cmd_fmt.calcsize())
-                if self._inp_type == _IoType.DISPATCH
+                width_bits_to_bytes(self._cmd_fmt.calcsize())
+                if self._inp_type == IoType.DISPATCH
                 else 0
             )
         )
@@ -234,7 +235,7 @@ class Processor(neuro.Processor):
                 raise RuntimeError("Did not receive coherent response from target.")
 
             match self._out_type:
-                case _IoType.DISPATCH:
+                case IoType.DISPATCH:
                     for _ in range(self._out_fmt.unpack(rx)[None]):
                         sub_rx = self._interface.read(
                             num_rx_bytes, 10 * num_rx_bytes / self._interface.baudrate
@@ -247,7 +248,7 @@ class Processor(neuro.Processor):
                             self._hw_time
                         )
 
-                case _IoType.STREAM:
+                case IoType.STREAM:
                     for out_idx, fire in self._out_fmt.unpack(rx).items():
                         if fire:
                             self._out_queue[out_idx].append(self._hw_time)
@@ -261,7 +262,7 @@ class Processor(neuro.Processor):
             raise ValueError("Cannot send spikes to non-input node.")
 
         match self._inp_type:
-            case _IoType.DISPATCH:
+            case IoType.DISPATCH:
                 [
                     self._interface.write(
                         self._spk_fmt.pack(
@@ -290,7 +291,7 @@ class Processor(neuro.Processor):
                     )
                     self._hw_rx(runs % self._max_run)
 
-            case _IoType.STREAM:
+            case IoType.STREAM:
                 if not runs:
                     raise RuntimeError(
                         "Cannot send spikes to stream source without running."
@@ -421,16 +422,17 @@ class Processor(neuro.Processor):
 
     def _set_schema(self):
         net_charge_width = charge_width(self._network)
-        opc_width = _clog2(len(self._Opcode))
+        opc_width = opcode_width(self._Opcode)
+
         spk_names = list()
         spk_fmt_str = ""
         spk_names.append("opcode")
         spk_fmt_str += f"u{opc_width}"
         match self._inp_type:
-            case _IoType.DISPATCH:
-                idx_width = _clog2(self._network.num_inputs())
-                spk_width = idx_width + net_charge_width
-                operand_width = _width_nearest_byte(opc_width + spk_width) - opc_width
+            case IoType.DISPATCH:
+                idx_width, operand_width = dispatch_operand_widths(
+                    self._network.num_inputs(), net_charge_width
+                )
 
                 cmd_names = spk_names + ["operand"]
                 cmd_fmt_str = spk_fmt_str + f"u{operand_width}"
@@ -442,7 +444,7 @@ class Processor(neuro.Processor):
                     spk_fmt_str += f"u{idx_width}"
                 spk_names.append("value")
                 spk_fmt_str += f"s{net_charge_width}"
-            case _IoType.STREAM:
+            case IoType.STREAM:
                 spk_names.extend(range(self._network.num_inputs()))
                 spk_fmt_str += "".join(
                     f"s{net_charge_width}" for _ in range(self._network.num_inputs())
@@ -452,10 +454,10 @@ class Processor(neuro.Processor):
         self._spk_fmt = bs.compile(spk_fmt_str, spk_names)
 
         match self._out_type:
-            case _IoType.DISPATCH:
+            case IoType.DISPATCH:
                 out_names = [None]
-                out_fmt_str = f"u{_clog2(self._network.num_outputs() + 1)}"
-            case _IoType.STREAM:
+                out_fmt_str = f"u{clog2(self._network.num_outputs() + 1)}"
+            case IoType.STREAM:
                 out_names = list(range(self._network.num_outputs()))
                 out_fmt_str = "".join("b1" for _ in range(self._network.num_outputs()))
             case _:
