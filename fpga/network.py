@@ -243,8 +243,11 @@ def hash_network(net: neuro.Network, length: int = None) -> str:
     ).hexdigest()[:length]
 
 
-def build_network_sv(net: neuro.Network) -> pl.Path:
-    fpath = fpga.networks_build_path / (hash_network(net, HASH_LEN) + ".sv")
+def build_network_sv(net: neuro.Network, net_path: str = "") -> pl.Path:
+    if net_path == "":
+        fpath = fpga.networks_build_path / (hash_network(net, HASH_LEN) + ".sv")
+    else:
+        fpath = pl.Path(net_path)
     if not fpath.is_file():
         fpath.parent.mkdir(parents=True, exist_ok=True)
         with open(fpath, "w") as sv:

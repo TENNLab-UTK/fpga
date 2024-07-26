@@ -25,7 +25,7 @@ module axis_processor (
     axis.s s_axis,
     axis.m m_axis
 );
-    logic net_valid, net_ready, net_out;
+    logic net_valid, snk_valid, net_ready, net_out, last_cycle, last_pkt;
 
     network_source #(
         .RUN_WIDTH(RUN_WIDTH)
@@ -54,11 +54,24 @@ module axis_processor (
         .net_ready,
         .net_out,
         .snk_ready(m_axis.tready),
-        .snk_valid(m_axis.tvalid)
+        .snk_valid(snk_valid)
+    );
+
+    axis_packetize packetize (
+        .clk,
+        .arstn,
+        .tvalid(m_axis.tvalid),
+        .tready(m_axis.tready),
+        .last_cycle,
+        .last_pkt
     );
 
     always_comb begin : calc_m_axis_tdata
         m_axis.tdata[OUT_WIDTH-1:0] = 0;
         m_axis.tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = sink.snk;
     end
+    
+    assign m_axis.tvalid = last_cycle | snk_valid;
+    assign m_axis.tlast = last_cycle | (last_pkt & m_axis.tvalid);
+    assign m_axis.tkeep = 4'b1111;
 endmodule
