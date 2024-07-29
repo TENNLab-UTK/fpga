@@ -4,6 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 import base64
+from re import I
 
 import dash_bootstrap_components as dbc
 from dash import (
@@ -25,6 +26,7 @@ import fpga._processor
 from fpga._math import (
     bools_to_signed,
     bools_to_unsigned,
+    clog2,
     signed_to_bools,
     unsigned_to_bools,
     width_padding_to_byte,
@@ -233,6 +235,7 @@ app.layout = dbc.Container(
                     dbc.Table(
                         id="sink_table",
                         bordered=True,
+                        responsive=True,
                     )
                 ),
             ]
@@ -355,7 +358,10 @@ def update_opcode_table(interfaces, source_type_str, net_num_inp, proc_charge_wi
         ]
     )
     return [
-        html.Tbody([html.Tr(row) for row in rows], id={"type": "source_table_body"})
+        html.Tbody(
+            [html.Thead(row) if row == 0 else html.Tr(row) for row in rows],
+            id={"type": "source_table_body"},
+        )
     ]
 
 
@@ -675,6 +681,118 @@ def update_operand(
 
         case _:
             raise ValueError()
+
+
+@callback(
+    Output("sink_table", "children"),
+    Input("interfaces", "value"),
+    Input("sink_type", "value"),
+    Input("num_out", "value"),
+)
+def update_sink_table(interfaces, sink_type_str, net_num_out):
+    out_type = io_type(sink_type_str)
+
+    rows = [[], []]
+
+    match out_type:
+        case IoType.DISPATCH:
+            idx_width = clog2(net_num_out + 1)
+            padding = (
+                width_padding_to_byte(idx_width) if "AXI Stream" in interfaces else 0
+            )
+            rows[0].append(
+                html.Th(f"Number of Fires, Output Index Fired", colSpan=idx_width)
+            )
+            [
+                rows[1].append(
+                    html.Td(
+                        dbc.Switch(
+                            id={"type": "out_switch", "index": out},
+                            value=False,
+                            disabled=False,
+                        )
+                    )
+                )
+                for out in range(idx_width)
+            ]
+            rows.extend(
+                [
+                    [
+                        html.Td(
+                            dbc.Input(
+                                id={"type": "out_idx"},
+                                type="number",
+                                inputMode="numeric",
+                                value=0,
+                                min=0,
+                                max=net_num_out,
+                            ),
+                            colSpan=idx_width,
+                        )
+                    ]
+                    + [html.Td() for _ in range(padding)]
+                ]
+            )
+
+        case IoType.STREAM:
+            padding = (
+                width_padding_to_byte(net_num_out) if "AXI Stream" in interfaces else 0
+            )
+
+            [
+                rows[0].append(html.Th(f"Output {out} Fire"))
+                for out in range(net_num_out)
+            ]
+            [
+                rows[1].append(
+                    html.Td(
+                        dbc.Switch(
+                            id={"type": "fire_switch", "index": out},
+                            value=False,
+                            disabled=False,
+                        )
+                    )
+                )
+                for out in range(net_num_out)
+            ]
+
+        case _:
+            raise ValueError()
+
+    if padding:
+        rows[0].append(html.Th("Padding", colSpan=padding))
+        [
+            rows[1].append(
+                html.Td(
+                    dbc.Switch(
+                        id={"type": "fire_switch", "index": out},
+                        value=False,
+                        disabled=True,
+                    )
+                )
+            )
+            for out in range(padding)
+        ]
+
+    return [
+        html.Tbody(
+            [html.Thead(row) if row == 0 else html.Tr(row) for row in rows],
+            id={"type": "sink_table_body"},
+        )
+    ]
+
+
+@callback(
+    Output({"type": "out_idx"}, "value"),
+    Output({"type": "out_switch", "index": ALL}, "value"),
+    Input({"type": "out_idx"}, "value"),
+    Input({"type": "out_switch", "index": ALL}, "value"),
+)
+def update_output(out_idx, bit_switches):
+    if ctx.triggered_id and ctx.triggered_id["type"] == "out_idx":
+        return no_update, unsigned_to_bools(out_idx, len(bit_switches))
+    else:
+        return bools_to_unsigned(bit_switches), [no_update] * len(bit_switches)
 
 
 if __name__ == "__main__":
