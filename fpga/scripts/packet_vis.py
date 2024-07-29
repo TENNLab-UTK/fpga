@@ -245,20 +245,31 @@ app.layout = dbc.Container(
 
 
 @callback(
+    Output("param_select", "options"),
+    Output("param_select", "value"),
     Output("charge_width", "value"),
     Output("num_inp", "value"),
     Output("num_out", "value"),
-    Output("charge_width", "readonly"),
-    Output("num_inp", "readonly"),
-    Output("num_out", "readonly"),
     Input("param_select", "value"),
-    State("network_file", "contents"),
-    State("charge_width", "value"),
-    State("num_inp", "value"),
-    State("num_out", "value"),
+    Input("network_file", "contents"),
+    Input("charge_width", "value"),
+    Input("num_inp", "value"),
+    Input("num_out", "value"),
 )
 def update_parameters(select, contents, net_charge_width, num_inp, num_out):
-    if select == "File":
+    options = Patch()
+    if ctx.triggered_id and ctx.triggered_id == "network_file" and contents:
+        select = "File"
+
+    if not contents:
+        options[0]["disabled"] = True
+
+    if (
+        ctx.triggered_id
+        and ctx.triggered_id in ["param_select", "network_file"]
+        and select == "File"
+    ):
+        options[0]["disabled"] = False
         _, content_string = contents.split(",")
         text = base64.b64decode(content_string).decode("utf-8")
         net = Network()
@@ -266,24 +277,9 @@ def update_parameters(select, contents, net_charge_width, num_inp, num_out):
         proc_params = net.get_data("proc_params").to_python()
         if not proc_params["discrete"]:
             raise ValueError("Non-discrete network targeting FPGA not yet supported.")
-        return charge_width(net), net.num_inputs(), net.num_outputs(), True, True, True
+        return options, select, charge_width(net), net.num_inputs(), net.num_outputs()
     else:
-        return net_charge_width, num_inp, num_out, False, False, False
-
-
-@callback(
-    Output("param_select", "options"),
-    Output("param_select", "value"),
-    Input("network_file", "contents"),
-    State("param_select", "options"),
-)
-def enable_param_select(contents, options):
-    if contents is not None:
-        options[0]["disabled"] = False
-        return options, "File"
-    else:
-        options[0]["disabled"] = True
-        return options, "Manual"
+        return options, "Manual", no_update, no_update, no_update
 
 
 @callback(
