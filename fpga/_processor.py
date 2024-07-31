@@ -126,9 +126,6 @@ class Processor(neuro.Processor):
         match self._io_type[2:]:
             case "DO":
                 self._out_type = IoType.DISPATCH
-                raise NotImplementedError(
-                    "Dispatch output is currently malfunctioning."
-                )
             case "SO":
                 self._out_type = IoType.STREAM
             case _:
