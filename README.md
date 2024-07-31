@@ -154,7 +154,7 @@ import fpga
 net = neuro.Network()
 net.read_from_file("networks/simple.txt")
 
-proc = fpga.Processor("basys3", "/dev/ttyUSB1", "DISO")
+proc = fpga.Processor("basys3", "/dev/ttyUSB1", "DIDO")
 proc.load_network(net)
 
 proc.apply_spikes([neuro.Spike(0, i, 9) for i in range(3)])
