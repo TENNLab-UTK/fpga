@@ -3,8 +3,8 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
+import argparse
 import base64
-from re import I
 
 import dash_bootstrap_components as dbc
 from dash import (
@@ -21,6 +21,7 @@ from dash import (
     no_update,
 )
 from neuro import Network
+from waitress import serve
 
 import fpga._processor
 from fpga._math import (
@@ -256,7 +257,10 @@ app.layout = dbc.Container(
     Input("num_inp", "value"),
     Input("num_out", "value"),
 )
-def update_parameters(select, contents, net_charge_width, num_inp, num_out):
+def update_parameters(select, contents, proc_charge_width, net_num_inp, net_num_out):
+    if None in [proc_charge_width, net_num_inp, net_num_out]:
+        # values between changes
+        return no_update, no_update, no_update, no_update, no_update
     options = Patch()
     if ctx.triggered_id and ctx.triggered_id == "network_file" and contents:
         select = "File"
@@ -308,13 +312,9 @@ def update_interface_options(interfaces_value):
 
 @callback(
     Output("source_table", "children"),
-    Input("interfaces", "value"),
     Input("source_type", "value"),
-    Input("num_inp", "value"),
-    Input("charge_width", "value"),
 )
-def update_opcode_table(interfaces, source_type_str, net_num_inp, proc_charge_width):
-    inp_type = io_type(source_type_str)
+def update_opcode_table(source_type_str):
     opc_type = opcode_type(source_type_str)
     opc_width = opcode_width(opc_type)
 
@@ -330,16 +330,6 @@ def update_opcode_table(interfaces, source_type_str, net_num_inp, proc_charge_wi
             )
         ],
     ]
-
-    match inp_type:
-        case IoType.DISPATCH:
-            _, operand_width = dispatch_operand_widths(
-                net_num_inp, proc_charge_width, "AXI Stream" in interfaces
-            )
-        case IoType.STREAM:
-            operand_width = net_num_inp * proc_charge_width
-            if "AXI Stream" in interfaces:
-                operand_width += width_padding_to_byte(opc_width + operand_width)
 
     rows.append(
         [
@@ -387,15 +377,15 @@ def update_opcode(opcode_str, bit_switches, source_type_str):
 @callback(
     Output({"type": "source_table_body"}, "children"),
     Input({"type": "opcode"}, "value"),
-    State("interfaces", "value"),
+    Input("interfaces", "value"),
+    Input("num_inp", "value"),
+    Input("charge_width", "value"),
     State("source_type", "value"),
-    State("num_inp", "value"),
-    State("charge_width", "value"),
     # need the old body to get lengths of rows, etc.
     State({"type": "source_table_body"}, "children"),
 )
 def update_operand_table(
-    opcode_str, interfaces, source_type_str, net_num_inp, proc_charge_width, old_body
+    opcode_str, interfaces, net_num_inp, proc_charge_width, source_type_str, old_body
 ):
     inp_type = io_type(source_type_str)
     opc_type = opcode_type(source_type_str)
@@ -597,6 +587,10 @@ def update_operand(
     net_num_inp,
     proc_charge_width,
 ):
+    if ctx.triggered_id and ctx.triggered_id["type"] == "operand" and None in operands:
+        # value between changes
+        return [no_update] * len(operands), [no_update] * len(bit_switches)
+
     inp_type = io_type(source_type_str)
     opc_type = opcode_type(source_type_str)
     opc_width = opcode_width(opc_type)
@@ -686,6 +680,10 @@ def update_operand(
     Input("num_out", "value"),
 )
 def update_sink_table(interfaces, sink_type_str, net_num_out):
+    if net_num_out is None:
+        # value between changes
+        return no_update
+
     out_type = io_type(sink_type_str)
 
     rows = [[], []]
@@ -786,10 +784,30 @@ def update_sink_table(interfaces, sink_type_str, net_num_out):
 )
 def update_output(out_idx, bit_switches):
     if ctx.triggered_id and ctx.triggered_id["type"] == "out_idx":
+        if out_idx is None:
+            # value between changes
+            return no_update, [no_update] * len(bit_switches)
         return no_update, unsigned_to_bools(out_idx, len(bit_switches))
     else:
         return bools_to_unsigned(bit_switches), [no_update] * len(bit_switches)
 
 
+def main():
+    parser = argparse.ArgumentParser(
+        prog="packet-vis", description="Packet Visualization Utility"
+    )
+    parser.add_argument(
+        "-p",
+        dest="port",
+        type=int,
+        default=8050,
+        help="Port number for visualization web server (defaults to 8050)",
+    )
+    args = parser.parse_args()
+
+    print(f"Packet Visualization running on http://0.0.0.0:{args.port}/")
+    serve(app.server, port=args.port)
+
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    main()
