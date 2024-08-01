@@ -20,7 +20,13 @@ from periphery import Serial
 
 import fpga
 from fpga import config, rtl
-from fpga.network import HASH_LEN, build_network_sv, charge_width, hash_network
+from fpga.network import (
+    HASH_LEN,
+    build_network_sv,
+    charge_width,
+    hash_network,
+    input_scaling_value,
+)
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -209,6 +215,9 @@ class Processor(neuro.Processor):
             run_time = int(self._inp_queue[0].time) if self._inp_queue else target_time
             self._hw_tr(spikes, runs=(run_time - self._hw_time))
 
+    def _get_input_spike_factor(self) -> float:
+        return input_scaling_value(self._network)
+
     def _hw_rx(self, runs: int) -> None:
         self._interface.flush()
         num_rx_bytes = _width_bits_to_bytes(self._out_fmt.calcsize())
@@ -252,7 +261,10 @@ class Processor(neuro.Processor):
 
     def _hw_tr(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
         spike_dict = {
-            self._network.get_node(s.id).input_id: int(s.value) for s in spikes
+            self._network.get_node(s.id).input_id: int(
+                s.value * self._get_input_spike_factor()
+            )
+            for s in spikes
         }
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")

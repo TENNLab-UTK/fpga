@@ -32,6 +32,19 @@ def charge_width(net: neuro.Network) -> int:
     )
 
 
+def input_scaling_value(net: neuro.Network) -> float:
+    proc_params = net.get_data("proc_params").to_python()
+    if "input_scaling_value" in proc_params:
+        return proc_params["input_scaling_value"]
+    else:
+        return float(proc_params["max_threshold"]) + float(
+            int(
+                "threshold_inclusive" in proc_params
+                and proc_params["threshold_inclusive"]
+            )
+        )
+
+
 def _num_inp_ports(node: neuro.Node) -> int:
     return len(node.incoming) + (1 if (node.input_id > -1) else 0)
 
