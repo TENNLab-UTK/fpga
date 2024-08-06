@@ -48,10 +48,10 @@ module network_source #(
         if (arstn == 0) begin
             net_valid <= 0;
         end else begin
-            if (src_valid) begin
-                net_valid <= 1;
-            end else if (net_valid && net_ready) begin
+            if (net_valid && net_ready) begin
                 net_valid <= 0;
+            end else if (src_valid && net_ready) begin
+                net_valid <= 1;
             end
         end
     end
