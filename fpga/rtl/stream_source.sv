@@ -48,28 +48,18 @@ module network_source #(
         if (arstn == 0) begin
             net_valid <= 0;
         end else begin
-            net_valid <= src_valid;         // net data is valid iff stream source is valid
+            if (net_valid && net_ready) begin
+                net_valid <= 0;
+            end else if (src_valid && net_ready) begin
+                net_valid <= 1;
+            end
         end
     end
 
     logic net_en;
     assign net_en = src_valid && net_ready;
 
-    logic was_ready;
-
-    always_ff @(posedge clk or negedge arstn) begin: set_was_ready
-        if (arstn == 0) begin
-            was_ready <= 0;
-        end else begin
-            if (net_en && !was_ready) begin
-                was_ready <= 1;             // special condition to prevent additional ready cycle for fast sources
-            end else begin
-                was_ready <= 0;
-            end
-        end
-    end
-
-    assign src_ready = net_ready && !was_ready;
+    assign src_ready = net_ready && !net_valid;
 
     assign net_arstn = (arstn == 0) ? 0 : !(net_en && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR));
 
