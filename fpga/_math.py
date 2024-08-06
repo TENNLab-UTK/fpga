@@ -22,20 +22,33 @@ def width_nearest_byte(bits: int) -> int:
     return width_bytes_to_bits(width_bits_to_bytes(bits))
 
 
-def width_is_byte_aligned(bits: int) -> bool:
-    return bits % 8 == 0
-
-
 def width_padding_to_byte(bits: int) -> int:
     return width_nearest_byte(bits) - bits
 
 
-def uint_to_bool_list(value: int, width: int = 0) -> list[bool]:
+def unsigned_to_bools(value: int, width: int = 0) -> list[bool]:
     if not width:
         width = clog2(value + 1)
-    if value >= 2 ** width:
-        raise ValueError(f"Value {value} is too large for width {width}")
-    return [bool(value & (1 << i)) for i in range(width - 1, -1, -1)]
+    if value >= 2**width:
+        raise ValueError(f"Value of {value} is too large for width {width}")
+    elif value < 0:
+        raise ValueError(f"Value of {value} is negative")
+    return signed_to_bools(value, width + 1)[1:]
 
-def bool_list_to_uint(value: list[bool]) -> int:
-    return sum([int(bool(value[i])) << (len(value) - i - 1) for i in range(len(value))])
+
+def bools_to_unsigned(value: list[bool]) -> int:
+    return bools_to_signed([False] + value)
+
+
+def signed_to_bools(value: int, width: int = 0) -> list[bool]:
+    if not width:
+        width = clog2(value + 1) + 1
+    if value >= 2 ** (width - 1) or value < -(2 ** (width - 1)):
+        raise ValueError(f"Absolute value of {value} is too large for width {width}")
+    return [value < 0] + [bool(value & (1 << i)) for i in range(width - 2, -1, -1)]
+
+
+def bools_to_signed(value: list[bool]) -> int:
+    return sum(
+        [int(bool(value[i])) << (len(value) - i - 1) for i in range(1, len(value))]
+    ) - (value[0] * 2 ** (len(value) - 1))

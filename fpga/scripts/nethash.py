@@ -11,7 +11,8 @@ import neuro
 
 from fpga.network import hash_network
 
-if __name__ == "__main__":
+
+def main():
     args = argparse.ArgumentParser(prog="nethash", description="Get SHA256 of network.")
     args.add_argument("target", type=pl.Path, help="JSON network filepath")
     args = args.parse_args()
@@ -19,3 +20,7 @@ if __name__ == "__main__":
     net = neuro.Network()
     net.read_from_file(str(args.target))
     print(hash_network(net))
+
+
+if __name__ == "__main__":
+    main()
