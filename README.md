@@ -71,7 +71,11 @@ Install any simulators you wish to use which are [compatible with cocotb](https:
 
 If you wish to see waveform outputs from the sims, install gtkwave.
 
-#### Framework (required)
+#### EDA Toolchains
+
+The EDA toolchains you require will depend on which devices you are targetting. For example, the Basys3 board as configured so far in this repository, requires the Vivado software by AMD/Xilinx. Open-source toolchains are available but are not the primary focus of this project. Theoretically [any EDA tool compatible with Edalize](https://edalize.readthedocs.io/en/latest/edalize.html) can be used in this project.
+
+#### Framework (required) <a name = "framework"></a>
 
 First, clone the UTK TENNLab Neuromorphic Framework repository and enter it.
 
@@ -94,7 +98,7 @@ Finally, install the `framework` python package.
 pip install -e .
 ```
 
-### Installing
+### Installing <a name = "installing"></a>
 
 Clone this repository into the requisite location (tentatively `./fpga`).
 
@@ -133,7 +137,7 @@ There is a built-in "loopback" test that attempts communicating with standard ba
 Below is an example of using the loopback test for a Digilent Basys3 board. Your cdev path will depend on your machine, and make sure your user is in the `dialout` group or has other permissions to access it.
 
 ```bash
-python fpga/scripts/uart_loop.py basys3 /dev/ttyUSB1
+uart-loop basys3 /dev/ttyUSB1
 ```
 
 If the passing baud rates do not match the [hardware configuration "database"](/fpga/config/targets.json) then it will prompt you to update the rates.
@@ -141,7 +145,7 @@ If the passing baud rates do not match the [hardware configuration "database"](/
 
 ## 🎈 Usage <a name="usage"></a>
 
-The API for using the FPGA neuroprocessor is extremely similar to the standard Framework API.
+The API for using the FPGA neuroprocessor is extremely similar to the standard Framework API. This is an [example](/example.py) using a simple two-neuron network.
 
 ```python
 import neuro
@@ -150,20 +154,27 @@ import fpga
 net = neuro.Network()
 net.read_from_file("networks/simple.txt")
 
-proc = fpga.Processor("basys3", "/dev/ttyUSB1", "DISO")
+proc = fpga.Processor("basys3", "/dev/ttyUSB1", "DIDO")
 proc.load_network(net)
 
 proc.apply_spikes([neuro.Spike(0, i, 9) for i in range(3)])
 proc.run(6)
-proc.output_last_fire(0)
+print(proc.output_last_fire(0))
 ```
 
 Support for additional FPGA targets can be accomplished by adding entries to the [targets config file](fpga/config/targets.json) and an accompanying folder containing relevant files, e.g. the top-level module and contraints files.
 
+### Creating Your Own Runtime Front-End
+
+There a scenarios where using the Python API for processor runtime is not feasible or optimal. For those users who wish to still use the FPGA framework for building the networks and processors, but write a separate front-end to suit their platforms, this package includes a web-based interactive visualization for processor packets.
+
+To run it, simply follow the instructions in [Framework (required)](#framework) and [Installing](#installing) and run the `packet-vis` command.
+
 ## ⛏️ Built Using <a name = "built_using"></a>
 
 - [cocotb](https://www.cocotb.org) - HDL Testbench Framework
-- [edalize](https://github.com/olofk/edalize) - Python API for EDA Toolchains
+- [Edalize](https://github.com/olofk/edalize) - Python API for EDA Toolchains
+- [Plotly Dash](https://dash.plotly.com/) & [Dash Bootstrap Components](https://dash-bootstrap-components.opensource.faculty.ai/) - Used in the Packet Visualization app.
 
 ## ✍️ Authors <a name = "authors"></a>
 

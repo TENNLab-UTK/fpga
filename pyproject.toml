@@ -35,13 +35,22 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "bitstruct",
+    "dash",
+    "dash-bootstrap-components",
     "edalize",
     "framework",
     "numpy",
     "platformdirs",
     "python-periphery",
     "tqdm",
+    "waitress",
 ]
+
+[project.scripts]
+nethash = "fpga.scripts.nethash:main"
+nethdl = "fpga.scripts.nethdl:main"
+packet-vis = "fpga.scripts.packet_vis:main"
+uart-loop = "fpga.scripts.uart_loop:main"
 
 [project.optional-dependencies]
 test = [
