@@ -1,0 +1,39 @@
+{ "Properties":
+  { "node_properties": [
+      { "name":"Threshold", "type":73, "index":0, "size":1, "min_value":-1.0, "max_value":1.0 }],
+    "edge_properties": [
+      { "name":"Delay", "type":73, "index":1, "size":1, "min_value":1.0, "max_value":5.0 },
+      { "name":"Weight", "type":73, "index":0, "size":1, "min_value":-1.0, "max_value":1.0 }],
+    "network_properties": [] },
+ "Nodes":
+  [ {"id":0,"values":[1.0]},
+    {"id":4,"values":[1.0]},
+    {"id":1,"values":[1.0]},
+    {"id":2,"values":[1.0]},
+    {"id":3,"values":[1.0]} ],
+ "Edges":
+  [ {"from":1,"to":3,"values":[1.0,1.0]},
+    {"from":1,"to":2,"values":[-1.0,1.0]},
+    {"from":3,"to":2,"values":[1.0,1.0]},
+    {"from":0,"to":2,"values":[1.0,1.0]},
+    {"from":2,"to":4,"values":[1.0,1.0]},
+    {"from":0,"to":3,"values":[-1.0,1.0]},
+    {"from":2,"to":3,"values":[1.0,1.0]},
+    {"from":3,"to":4,"values":[1.0,1.0]} ],
+ "Inputs": [0,1],
+ "Outputs": [4],
+ "Network_Values": [],
+ "Associated_Data":
+   { "other": {"proc_name":"risp"},
+     "proc_params": 
+      { "discrete": true,
+        "fire_like_ravens": false,
+        "leak_mode": "none",
+        "max_delay": 5,
+        "max_threshold": 1.0,
+        "max_weight": 1.0,
+        "min_threshold": -1.0,
+        "min_weight": -1.0,
+        "non_negative_charge": false,
+        "run_time_inclusive": false,
+        "threshold_inclusive": true}}}

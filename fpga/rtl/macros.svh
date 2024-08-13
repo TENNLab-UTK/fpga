@@ -15,6 +15,7 @@
 `define width_bits_to_bytes(w) (((w) + 7) / 8)
 `define width_bytes_to_bits(w) ((w) * 8)
 `define width_nearest_byte(w) `width_bytes_to_bits(`width_bits_to_bytes(w))
+`define width_nearest_pow2_bytes(w) 1 << $clog2(`width_bits_to_bytes(w))
 
 // signed number representation helper functions
 `define signed_repr_max(WIDTH) (1 << ((WIDTH)-1)) - 1

@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+import processor_tlast_config::*;
+
 module dma_simple_axis_tb;
 
     // Global signals
@@ -9,15 +11,15 @@ module dma_simple_axis_tb;
     // AXIS master signals
     logic m_tvalid;
     logic m_tready;
-    logic [31:0] m_tdata;
-    logic [3:0] m_tkeep;
+    logic [(OUT_TDATA_WIDTH_BYTES * 8 - 1):0] m_tdata;
+    logic [OUT_TDATA_WIDTH_BYTES-1:0] m_tkeep;
     logic m_tlast;
     
     // AXIS slave signals
     logic s_tvalid;
     logic s_tready;
-    logic [31:0] s_tdata;
-    logic [3:0] s_tkeep;
+    logic [(INP_TDATA_WIDTH_BYTES * 8 - 1):0] s_tdata;
+    logic [INP_TDATA_WIDTH_BYTES-1:0] s_tkeep;
     logic s_tlast;
 
     // axis_processor_top uut (
@@ -35,8 +37,8 @@ module dma_simple_axis_tb;
     //     .s_tlast(s_tlast)
     // );
 
-    axis s_axis();
-    axis m_axis();
+    axis #(.DATA_WIDTH_BYTES(INP_TDATA_WIDTH_BYTES)) s_axis();
+    axis #(.DATA_WIDTH_BYTES(OUT_TDATA_WIDTH_BYTES)) m_axis();
 
     assign s_axis.tvalid = s_tvalid;
     assign s_tready = s_axis.tready;
@@ -49,7 +51,7 @@ module dma_simple_axis_tb;
     assign m_tkeep = m_axis.tkeep;
     assign m_tlast = m_axis.tlast;
 
-    axis_processor uut (
+    axis_processor_tlast uut (
         .clk(clk),
         .arstn(arstn),
         .s_axis(s_axis),
@@ -74,40 +76,24 @@ module dma_simple_axis_tb;
 
         @(posedge clk);
 
-        // Set valid input data packet
-        s_tdata = 1;
+        // Set valid input data packet and wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
+        s_tdata = 8'h08;
         s_tkeep = 4'b1111;
         s_tvalid = 1;
-
-        // Wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
         @(posedge clk);
         while(s_tready != 1) begin
             @(posedge clk);
         end
 
-        // Set empty input data packet
-        s_tdata = 0;
-
-        // Wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
+        s_tdata = 8'h20;
         @(posedge clk);
         while(s_tready != 1) begin
             @(posedge clk);
         end
 
-        // Set empty input data packet
-        s_tdata = 0;
-
-        // Wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
-        @(posedge clk);
-        while(s_tready != 1) begin
-            @(posedge clk);
-        end
-
-        // Set empty input data packet for final transfer
-        s_tdata = 0;
+        // Last piece of data, so set tlast
+        s_tdata = 8'h28;
         s_tlast = 1;
-
-        // Wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
         @(posedge clk);
         while(s_tready != 1) begin
             @(posedge clk);
