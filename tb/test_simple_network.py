@@ -6,11 +6,11 @@
 
 import inspect
 import pathlib as pl
+from math import ceil
 from typing import Callable
 
 import cocotb
 import neuro
-import numpy as np
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from testing import reset, runner
@@ -43,9 +43,6 @@ async def inject_value(subject, clk, map_func: Callable[[int], int]) -> None:
 
 @cocotb.test()
 async def simple_network(dut: cocotb.handle.HierarchyObject) -> None:
-    full = net.get_data("proc_params").to_python()["max_weight"]
-    partial = 3
-
     thresh_idx = net.get_node_property("Threshold").index
     weight_idx = net.get_edge_property("Weight").index
     delay_idx = net.get_edge_property("Delay").index
@@ -55,11 +52,14 @@ async def simple_network(dut: cocotb.handle.HierarchyObject) -> None:
     weight = int(net.get_edge(0, 1).values[weight_idx])
     delay = int(net.get_edge(0, 1).values[delay_idx])
 
+    full = net.get_data("proc_params").to_python()["max_weight"]
+    partial = threshold_0 // 3
+
     full_start = 0
-    full_end = int(np.ceil(threshold_1 / weight)) + full_start
+    full_end = int(ceil(threshold_1 / weight)) + full_start
     partial_start = full_end + 1
     partial_end = (
-        int(np.ceil(threshold_1 / weight)) * int(np.ceil(threshold_0 / partial))
+        int(ceil(threshold_1 / weight)) * int(ceil(threshold_0 / partial))
         + partial_start
     )
 

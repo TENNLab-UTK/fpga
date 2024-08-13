@@ -15,7 +15,7 @@
  "Network_Values": [],
  "Associated_Data":
    { "other": {"proc_name":"risp"},
-     "proc_params": 
+     "proc_params":
       { "discrete": true,
         "fire_like_ravens": false,
         "leak_mode": "none",
