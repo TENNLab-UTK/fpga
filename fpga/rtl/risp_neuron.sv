@@ -25,7 +25,8 @@ module risp_neuron #(
 );
     localparam POTENTIAL_ABS_MAX = ((THRESHOLD < 0) ? -THRESHOLD : THRESHOLD) + !THRESHOLD_INCLUSIVE;
     localparam POTENTIAL_WIDTH = $clog2(POTENTIAL_ABS_MAX) + 1; // sign bit
-    localparam SUM_WIDTH = $clog2(NUM_INP * ((1 << (CHARGE_WIDTH - 2)) - 1) + POTENTIAL_ABS_MAX) + 1;
+    // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << (POTENTIAL_WIDTH - 1)))
+    localparam SUM_WIDTH = CHARGE_WIDTH + $clog2(NUM_INP + (1 << (POTENTIAL_WIDTH - CHARGE_WIDTH)));
 
     logic signed [POTENTIAL_WIDTH-1:0] potential;
     logic signed [SUM_WIDTH-1:0] sum;

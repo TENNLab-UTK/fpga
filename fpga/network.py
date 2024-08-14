@@ -95,8 +95,18 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     def thresh(node: neuro.Node) -> int:
         return int(node.values[thresh_idx])
 
-    leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
+    thresh_incl = (
+        proc_params["threshold_inclusive"]
+        if ("threshold_inclusive" in proc_params)
+        else True
+    )
+    non_negative_charge = (
+        proc_params["non_negative_charge"]
+        if ("non_negative_charge" in proc_params)
+        else False
+    )
 
+    leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
     match (leak_mode):
         case "none":
 
@@ -141,7 +151,9 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .THRESHOLD({thresh(node)}),\n")
         f.write(f"        .LEAK({leak(node)}),\n")
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
-        f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH)\n")
+        f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
+        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
+        f.write(f"        .NON_NEGATIVE_POTENTIAL({int(non_negative_charge)}),\n")
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
