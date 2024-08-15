@@ -8,28 +8,41 @@ import pathlib as pl
 import re
 from hashlib import sha256
 from json import dumps
-from math import ceil, log2, log10
+from math import ceil, log10
+from warnings import warn
 
 import neuro
 
 import fpga
+from fpga._math import signed_width
 
 HASH_LEN = 10
 
 
 def charge_width(net: neuro.Network) -> int:
     proc_params = net.get_data("proc_params").to_python()
-    return int(
-        ceil(
-            log2(
-                max(
-                    abs(proc_params["max_weight"] + 1),  # +1 for perfect powers of 2
-                    abs(proc_params["min_weight"]),
-                )
-            )
-        )
-        + 1  # +1 for the sign bit
+    weight_width = max(
+        [
+            signed_width(weight)
+            for weight in [
+                proc_params["min_weight"],
+                proc_params["max_weight"],
+            ]
+        ]
     )
+
+    scaling_width = signed_width(input_scaling_value(net))
+    if scaling_width > weight_width:
+        warn(
+            f"A scaling value of {input_scaling_value(net)}"
+            f" will mandate a network charge width of {scaling_width} bits"
+            f" which is greater than the charge width of {weight_width} bits"
+            " mandated by the weight range"
+            f" [{proc_params['min_weight']}, {proc_params['max_weight']}]."
+            " This will potentially waste hardware resources."
+        )
+
+    return max(weight_width, scaling_width)
 
 
 def input_scaling_value(net: neuro.Network) -> float:
@@ -37,11 +50,9 @@ def input_scaling_value(net: neuro.Network) -> float:
     if "input_scaling_value" in proc_params:
         return proc_params["input_scaling_value"]
     else:
-        return float(proc_params["max_threshold"]) + float(
-            int(
-                "threshold_inclusive" in proc_params
-                and proc_params["threshold_inclusive"]
-            )
+        return float(proc_params["max_threshold"]) + int(
+            "threshold_inclusive" in proc_params
+            and not proc_params["threshold_inclusive"]
         )
 
 
