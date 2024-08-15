@@ -52,7 +52,7 @@ def bools_to_signed(value: list[bool]) -> int:
 
 def unsigned_to_bools(value: int, width: int = 0) -> list[bool]:
     if not width:
-        width = clog2(value + 1)
+        width = unsigned_width(value)
     if value >= 2**width:
         raise ValueError(f"Value of {value} is too large for width {width}")
     elif value < 0:
