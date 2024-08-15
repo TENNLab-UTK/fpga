@@ -47,13 +47,14 @@ def charge_width(net: neuro.Network) -> int:
 
 def input_scaling_value(net: neuro.Network) -> float:
     proc_params = net.get_data("proc_params").to_python()
+    isv = float(proc_params["max_threshold"]) + int(
+        "threshold_inclusive" in proc_params and not proc_params["threshold_inclusive"]
+    )
     if "input_scaling_value" in proc_params:
-        return proc_params["input_scaling_value"]
-    else:
-        return float(proc_params["max_threshold"]) + int(
-            "threshold_inclusive" in proc_params
-            and not proc_params["threshold_inclusive"]
-        )
+        isv = proc_params["input_scaling_value"]
+    if isv < 1.0:
+        raise ValueError("Input scaling value must be greater than or equal to 1")
+    return isv
 
 
 def _num_inp_ports(node: neuro.Node) -> int:
@@ -150,6 +151,12 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
         )
         if node.input_id > -1:
+            if (thresh(node) + int(not thresh_incl)) > input_scaling_value(net):
+                warn(
+                    f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
+                    f" of {thresh(node)} which cannot be solely triggered by an"
+                    f" input scaling value of {input_scaling_value(net)}."
+                )
             # use the last indexed port for input to make synapse generation easier
             f.write(
                 f"    assign neur_{node.id:0{neur_id_digits}d}"
