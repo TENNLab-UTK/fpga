@@ -140,7 +140,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
         f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
         f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
-        f.write(f"        .NON_NEGATIVE_POTENTIAL({int(non_negative_charge)}),\n")
+        f.write(f"        .NON_NEGATIVE_POTENTIAL({int(non_negative_charge)})\n")
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
