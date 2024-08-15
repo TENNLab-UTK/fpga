@@ -76,6 +76,17 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
 
+    thresh_incl = (
+        proc_params["threshold_inclusive"]
+        if ("threshold_inclusive" in proc_params)
+        else True
+    )
+    non_negative_charge = (
+        proc_params["non_negative_charge"]
+        if ("non_negative_charge" in proc_params)
+        else False
+    )
+
     if "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]:
         raise NotImplementedError("RAVENS firing pattern is not yet supported.")
 
@@ -106,17 +117,6 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     def thresh(node: neuro.Node) -> int:
         return int(node.values[thresh_idx])
-
-    thresh_incl = (
-        proc_params["threshold_inclusive"]
-        if ("threshold_inclusive" in proc_params)
-        else True
-    )
-    non_negative_charge = (
-        proc_params["non_negative_charge"]
-        if ("non_negative_charge" in proc_params)
-        else False
-    )
 
     leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
     match (leak_mode):
