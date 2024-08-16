@@ -23,6 +23,7 @@ module risp_neuron #(
     input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
     output logic fire
 );
+    localparam THRESHOLD_ACTUAL = THRESHOLD + !THRESHOLD_INCLUSIVE;
     localparam POTENTIAL_ABS_MAX = ((THRESHOLD < 0) ? -THRESHOLD : THRESHOLD) + !THRESHOLD_INCLUSIVE;
     localparam POTENTIAL_WIDTH = $clog2(POTENTIAL_ABS_MAX) + 1; // sign bit
     // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << (POTENTIAL_WIDTH - 1)))
@@ -35,7 +36,7 @@ module risp_neuron #(
         // determine if neuron fires this cycle
         sum = (LEAK || (NON_NEGATIVE_POTENTIAL && (potential < 0))) ? 0 : potential;
         foreach(inp[i]) sum += inp[i];
-        fire = sum >= (THRESHOLD + !THRESHOLD_INCLUSIVE);
+        fire = sum >= THRESHOLD_ACTUAL;
     end
 
     always_ff @(posedge clk or negedge arstn) begin: set_potential
