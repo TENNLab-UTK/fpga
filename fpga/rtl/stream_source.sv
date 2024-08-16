@@ -44,45 +44,25 @@ module network_source #(
 );
 
 
-    always_ff @(posedge clk or negedge arstn) begin: set_net_valid
+    assign net_valid = src_valid;
+    assign src_ready = net_ready;
+
+    // "Now watch this (half-clock) drive!"
+    logic rst_p, rst_n;
+    assign rst_p = src_valid && net_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR);
+
+    always_ff @(negedge clk or negedge arstn) begin : nset_rstn
         if (arstn == 0) begin
-            net_valid <= 0;
+            rst_n <= 0;
         end else begin
-            net_valid <= src_valid;         // net data is valid iff stream source is valid
+            rst_n <= rst_p;
         end
     end
+    assign net_arstn = (arstn == 0) ? 0 : !(rst_p && !rst_n);
 
-    logic net_en;
-    assign net_en = src_valid && net_ready;
-
-    logic was_ready;
-
-    always_ff @(posedge clk or negedge arstn) begin: set_was_ready
-        if (arstn == 0) begin
-            was_ready <= 0;
-        end else begin
-            if (net_en && !was_ready) begin
-                was_ready <= 1;             // special condition to prevent additional ready cycle for fast sources
-            end else begin
-                was_ready <= 0;
-            end
-        end
-    end
-
-    assign src_ready = net_ready && !was_ready;
-
-    assign net_arstn = (arstn == 0) ? 0 : !(net_en && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR));
-
-    always_ff @(posedge clk or negedge arstn) begin: set_net_inp
-        if (arstn == 0) begin
-            foreach (net_inp[i])
-                net_inp[i] <= 0;
-        end else begin
-            if (net_en) begin
-                foreach (net_inp[i])
-                    net_inp[i] <= src[(`SRC_WIDTH - OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
-            end
-        end
+    always_comb begin: calc_net_inp
+        foreach (net_inp[i])
+            net_inp[i] = src[(`SRC_WIDTH - OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
     end
 
 
