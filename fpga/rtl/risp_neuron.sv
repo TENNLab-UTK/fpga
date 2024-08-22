@@ -8,6 +8,8 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
+`include "macros.svh"
+
 module risp_neuron #(
     parameter int THRESHOLD,
     parameter bit LEAK,
@@ -47,7 +49,7 @@ module risp_neuron #(
             if (fire) begin
                 fuse <= FUSE_START;
             end else begin
-                fuse <= $min(sum, FUSE_MAX);
+                fuse <= `min(sum, FUSE_MAX);
             end
         end
     end
