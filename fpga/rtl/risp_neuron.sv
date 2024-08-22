@@ -23,31 +23,31 @@ module risp_neuron #(
     input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
     output logic fire
 );
-    localparam BURNDOWN_START = THRESHOLD + !THRESHOLD_INCLUSIVE;
-    localparam BURNDOWN_MAX = BURNDOWN_START - MIN_POTENTIAL;
-    localparam BURNDOWN_WIDTH = $clog2(BURNDOWN_MAX + 1);
-    // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << BURNDOWN_WIDTH))
-    localparam SUM_WIDTH = CHARGE_WIDTH + $clog2(NUM_INP + (1 << (BURNDOWN_WIDTH - CHARGE_WIDTH + 1)));
+    localparam FUSE_START = THRESHOLD + !THRESHOLD_INCLUSIVE;
+    localparam FUSE_MAX = FUSE_START - POTENTIAL_MIN;
+    localparam FUSE_WIDTH = $clog2(FUSE_MAX + 1);
+    // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << FUSE_WIDTH))
+    localparam SUM_WIDTH = CHARGE_WIDTH + $clog2(NUM_INP + (1 << (FUSE_WIDTH - CHARGE_WIDTH + 1)));
 
-    // NOTE: "burndown" is THRESHOLD + !THRESHOLD_INCLUSIVE - potential
-    logic [POTENTIAL_WIDTH-1:0] burndown;
+    // NOTE: "fuse" is THRESHOLD + !THRESHOLD_INCLUSIVE - potential
+    logic [FUSE_WIDTH-1:0] fuse;
     logic signed [SUM_WIDTH-1:0] sum;
 
     always_comb begin: calc_fire
         // determine if neuron fires this cycle
-        sum = LEAK ? BURNDOWN_START : burndown;
+        sum = LEAK ? FUSE_START : fuse;
         foreach(inp[i]) sum -= inp[i];
         fire = sum <= 0;
     end
 
-    always_ff @(posedge clk or negedge arstn) begin: set_burndown
+    always_ff @(posedge clk or negedge arstn) begin: set_fuse
         if (arstn == 0) begin
-            potential <= BURNDOWN_START;
+            fuse <= FUSE_START;
         end else if (en) begin
             if (fire) begin
-                potential <= BURNDOWN_START;
+                fuse <= FUSE_START;
             end else begin
-                potential <= $min(sum, BURNDOWN_MAX);
+                fuse <= $min(sum, FUSE_MAX);
             end
         end
     end
