@@ -9,6 +9,7 @@ import re
 from hashlib import sha256
 from json import dumps
 from math import ceil, log2, log10
+from warnings import warn
 
 import neuro
 
@@ -88,11 +89,13 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         else True
     )
     if "min_potential" in proc_params:
-        if proc_params["min_potential"] <= 0:
-            min_potential = proc_params["min_potential"]
-        else:
+        if proc_params["min_potential"] > 0:
             raise ValueError("min_potential must be less than or equal to 0")
+        min_potential = proc_params["min_potential"]
     elif ("non_negative_charge" in proc_params) and proc_params["non_negative_charge"]:
+        warn(
+            "non_negative_charge is a deprecated field; set min_potential to 0 instead."
+        )
         min_potential = 0
     else:
         min_potential = -1 * proc_params["max_threshold"]
