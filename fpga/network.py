@@ -74,12 +74,6 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
 
-    thresh_incl = (
-        proc_params["threshold_inclusive"]
-        if ("threshold_inclusive" in proc_params)
-        else True
-    )
-
     if "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]:
         raise NotImplementedError("RAVENS firing pattern is not yet supported.")
 
