@@ -3,11 +3,11 @@
     "fire_like_ravens": false,
     "leak_mode": "none",
     "max_delay": 7,
-    "max_threshold": 127,
-    "max_weight": 127,
-    "min_threshold": -127,
-    "min_weight": -127,
-    "non_negative_charge": false,
+    "max_threshold": 127.0,
+    "max_weight": 127.0,
+    "min_threshold": -127.0,
+    "min_weight": -127.0,
+    "min_potential": -127.0,
     "run_time_inclusive": false,
     "threshold_inclusive": true
 }

@@ -24,6 +24,6 @@
         "max_weight": 127.0,
         "min_threshold": -127.0,
         "min_weight": -127.0,
-        "non_negative_charge": false,
+        "min_potential": -127.0,
         "run_time_inclusive": false,
         "threshold_inclusive": true}}}
