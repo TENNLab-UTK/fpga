@@ -81,11 +81,6 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         if ("threshold_inclusive" in proc_params)
         else True
     )
-    non_negative_charge = (
-        proc_params["non_negative_charge"]
-        if ("non_negative_charge" in proc_params)
-        else False
-    )
 
     if "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]:
         raise NotImplementedError("RAVENS firing pattern is not yet supported.")
@@ -117,6 +112,23 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     def thresh(node: neuro.Node) -> int:
         return int(node.values[thresh_idx])
+
+    thresh_incl = (
+        proc_params["threshold_inclusive"]
+        if ("threshold_inclusive" in proc_params)
+        else True
+    )
+    if "min_potential" in proc_params:
+        if proc_params["min_potential"] > 0:
+            raise ValueError("min_potential must be less than or equal to 0")
+        min_potential = proc_params["min_potential"]
+    elif ("non_negative_charge" in proc_params) and proc_params["non_negative_charge"]:
+        warn(
+            "non_negative_charge is a deprecated field; set min_potential to 0 instead."
+        )
+        min_potential = 0
+    else:
+        min_potential = -1 * proc_params["max_threshold"]
 
     leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
     match (leak_mode):
@@ -170,8 +182,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .LEAK({leak(node)}),\n")
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
         f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
-        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
-        f.write(f"        .NON_NEGATIVE_POTENTIAL({int(non_negative_charge)})\n")
+        f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
+        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)})\n")
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")

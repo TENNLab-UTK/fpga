@@ -45,7 +45,7 @@ The ground-up FPGA implementation of neuromorphic networks and processors in thi
 
 ### License
 
-The licenses for both hardware and software are **weakly reciprocal**, meaning users of this project need not distribute their larger works under the same license, but the full source, **incuding modifications**, of the code included in this repository must be made available according to the license terms described below.
+The licenses for both hardware and software are **weakly reciprocal**, meaning users of this project need not distribute their larger works under the same license, but the full source, **including modifications**, of the code included in this repository must be made available according to the license terms described below.
 
 #### Software
 
