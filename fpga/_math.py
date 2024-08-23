@@ -11,7 +11,7 @@ def clog2(value: float) -> int:
 
 
 def signed_width(value: int) -> int:
-    return clog2(abs(value) + int(value > 0)) + 1
+    return clog2(abs(value) + int(value >= 0)) + 1
 
 
 def unsigned_width(value: int) -> int:
