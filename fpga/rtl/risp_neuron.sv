@@ -8,13 +8,15 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
+`include "macros.svh"
+
 module risp_neuron #(
     parameter int THRESHOLD,
     parameter bit LEAK,
     parameter int NUM_INP,
     parameter int CHARGE_WIDTH,
+    parameter int POTENTIAL_MIN,
     parameter bit THRESHOLD_INCLUSIVE=1,
-    parameter bit NON_NEGATIVE_POTENTIAL=0,
     parameter bit FIRE_LIKE_RAVENS=0    // TODO Implement
 ) (
     input logic clk,
@@ -23,29 +25,31 @@ module risp_neuron #(
     input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
     output logic fire
 );
-    localparam POTENTIAL_ABS_MAX = ((THRESHOLD < 0) ? -THRESHOLD : THRESHOLD) + !THRESHOLD_INCLUSIVE;
-    localparam POTENTIAL_WIDTH = $clog2(POTENTIAL_ABS_MAX) + 1; // sign bit
-    // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << (POTENTIAL_WIDTH - 1)))
-    localparam SUM_WIDTH = CHARGE_WIDTH + $clog2(NUM_INP + (1 << (POTENTIAL_WIDTH - CHARGE_WIDTH)));
+    localparam FUSE_START = THRESHOLD + !THRESHOLD_INCLUSIVE;
+    localparam FUSE_MAX = FUSE_START - POTENTIAL_MIN;
+    localparam FUSE_WIDTH = $clog2(FUSE_MAX + 1);
+    // NOTE: simplification of $clog2(NUM_INP * (1 << (CHARGE_WIDTH - 1)) + (1 << FUSE_WIDTH))
+    localparam SUM_WIDTH = CHARGE_WIDTH + $clog2(NUM_INP + (1 << (FUSE_WIDTH - CHARGE_WIDTH + 1)));
 
-    logic signed [POTENTIAL_WIDTH-1:0] potential;
+    // NOTE: "fuse" is THRESHOLD + !THRESHOLD_INCLUSIVE - potential
+    logic [FUSE_WIDTH-1:0] fuse;
     logic signed [SUM_WIDTH-1:0] sum;
 
     always_comb begin: calc_fire
         // determine if neuron fires this cycle
-        sum = (LEAK || (NON_NEGATIVE_POTENTIAL && (potential < 0))) ? 0 : potential;
-        foreach(inp[i]) sum += inp[i];
-        fire = sum >= (THRESHOLD + !THRESHOLD_INCLUSIVE);
+        sum = LEAK ? FUSE_START : fuse;
+        foreach(inp[i]) sum -= inp[i];
+        fire = sum <= 0;
     end
 
-    always_ff @(posedge clk or negedge arstn) begin: set_potential
+    always_ff @(posedge clk or negedge arstn) begin: set_fuse
         if (arstn == 0) begin
-            potential <= 0;
+            fuse <= FUSE_START;
         end else if (en) begin
             if (fire) begin
-                potential <= 0;
+                fuse <= FUSE_START;
             end else begin
-                potential <= sum;
+                fuse <= `min(sum, FUSE_MAX);
             end
         end
     end
