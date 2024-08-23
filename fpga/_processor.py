@@ -26,7 +26,7 @@ from fpga.network import (
     build_network_sv,
     charge_width,
     hash_network,
-    input_scaling_value,
+    spike_value_factor,
 )
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
@@ -260,7 +260,7 @@ class Processor(neuro.Processor):
     def _hw_tr(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
         spike_dict = {
             self._network.get_node(s.id).input_id: int(
-                s.value * input_scaling_value(self._network)
+                s.value * spike_value_factor(self._network)
             )
             for s in spikes
         }
