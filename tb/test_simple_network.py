@@ -15,6 +15,8 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from testing import reset, runner
 
+from fpga.network import proc_params_dict
+
 proj_path = pl.Path(__file__).parent.parent
 net = neuro.Network()
 net.read_from_file(str(proj_path / "networks" / "simple.txt"))
@@ -52,7 +54,7 @@ async def simple_network(dut: cocotb.handle.HierarchyObject) -> None:
     weight = int(net.get_edge(0, 1).values[weight_idx])
     delay = int(net.get_edge(0, 1).values[delay_idx])
 
-    full = net.get_data("proc_params").to_python()["max_weight"]
+    full = proc_params_dict(net)["max_weight"]
     partial = threshold_0 // 3
 
     full_start = 0

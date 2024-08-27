@@ -26,6 +26,7 @@ from fpga.network import (
     build_network_sv,
     charge_width,
     hash_network,
+    proc_name,
     spike_value_factor,
 )
 
@@ -321,7 +322,7 @@ class Processor(neuro.Processor):
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
-        proc = self._network.get_data("other").to_python()["proc_name"]
+        proc = proc_name(self._network)
 
         nethash = hash_network(self._network, HASH_LEN)
         proj_path = fpga.eda_build_path / self._target_name / self._io_type / nethash
