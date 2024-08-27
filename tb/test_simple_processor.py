@@ -15,14 +15,14 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from testing import reset, runner
 
-from fpga.network import charge_width
+from fpga.network import charge_width, proc_params_dict
 
 proj_path = pl.Path(__file__).parent.parent
 net = neuro.Network()
 net.read_from_file(str(proj_path / "networks" / "simple.txt"))
 net_charge_width = charge_width(net)
 operand_width = int(np.ceil(np.log2(net.num_inputs()))) + net_charge_width
-full = net.get_data("proc_params").to_python()["max_weight"]
+full = proc_params_dict(net)["max_weight"]
 partial = 3
 
 _thresh_idx = net.get_node_property("Threshold").index
