@@ -54,7 +54,7 @@ async def simple_network(dut: cocotb.handle.HierarchyObject) -> None:
     weight = int(net.get_edge(0, 1).values[weight_idx])
     delay = int(net.get_edge(0, 1).values[delay_idx])
 
-    full = proc_params_dict(net)["max_weight"]
+    full = int(proc_params_dict(net)["max_weight"])
     partial = threshold_0 // 3
 
     full_start = 0
