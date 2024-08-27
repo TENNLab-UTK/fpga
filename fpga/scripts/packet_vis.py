@@ -38,7 +38,7 @@ from fpga._processor import (
     dispatch_operand_widths,
     opcode_width,
 )
-from fpga.network import charge_width
+from fpga.network import charge_width, proc_params_dict
 
 
 def io_type(io_type_str):
@@ -278,7 +278,7 @@ def update_parameters(select, contents, proc_charge_width, net_num_inp, net_num_
         text = base64.b64decode(content_string).decode("utf-8")
         net = Network()
         net.from_str(text)
-        proc_params = net.get_data("proc_params").to_python()
+        proc_params = proc_params_dict(net)
         if not proc_params["discrete"]:
             raise ValueError("Non-discrete network targeting FPGA not yet supported.")
         return options, select, charge_width(net), net.num_inputs(), net.num_outputs()

@@ -21,7 +21,13 @@ from periphery import Serial
 import fpga
 from fpga import config, rtl
 from fpga._math import clog2, width_bits_to_bytes, width_nearest_byte
-from fpga.network import HASH_LEN, build_network_sv, charge_width, hash_network
+from fpga.network import (
+    HASH_LEN,
+    build_network_sv,
+    charge_width,
+    hash_network,
+    proc_name,
+)
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -312,7 +318,7 @@ class Processor(neuro.Processor):
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
-        proc = self._network.get_data("other").to_python()["proc_name"]
+        proc = proc_name(self._network)
 
         nethash = hash_network(self._network, HASH_LEN)
         proj_path = fpga.eda_build_path / self._target_name / self._io_type / nethash
