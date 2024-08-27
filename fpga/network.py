@@ -46,7 +46,7 @@ def charge_width(net: neuro.Network) -> int:
 
 
 def spike_value_factor(net: neuro.Network) -> float:
-    proc_params = net.get_data("proc_params").to_python()
+    proc_params = proc_params_dict(net)
     svf = float(proc_params["max_weight"])
     if "spike_value_factor" in proc_params:
         svf = proc_params["spike_value_factor"]
