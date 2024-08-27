@@ -20,13 +20,14 @@ from periphery import Serial
 
 import fpga
 from fpga import config, rtl
-from fpga._math import clog2, width_bits_to_bytes, width_nearest_byte
+from fpga._math import unsigned_width, width_bits_to_bytes, width_nearest_byte
 from fpga.network import (
     HASH_LEN,
     build_network_sv,
     charge_width,
     hash_network,
     proc_name,
+    spike_value_factor,
 )
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
@@ -75,14 +76,14 @@ class StreamOpcode(IntEnum):
 
 
 def opcode_width(opcode_type: type) -> int:
-    return clog2(len(opcode_type))
+    return unsigned_width(len(opcode_type) - 1)
 
 
 def dispatch_operand_widths(
     net_num_inp: int, net_charge_width: int, is_axi: bool = True
 ) -> tuple[int, int]:
     opc_width = opcode_width(DispatchOpcode)
-    idx_width = clog2(net_num_inp)
+    idx_width = unsigned_width(net_num_inp - 1)
     spk_width = idx_width + net_charge_width
     operand_width = (
         width_nearest_byte(opc_width + spk_width) - opc_width if is_axi else spk_width
@@ -259,7 +260,10 @@ class Processor(neuro.Processor):
 
     def _hw_tr(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
         spike_dict = {
-            self._network.get_node(s.id).input_id: int(s.value) for s in spikes
+            self._network.get_node(s.id).input_id: int(
+                s.value * spike_value_factor(self._network)
+            )
+            for s in spikes
         }
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
@@ -459,7 +463,7 @@ class Processor(neuro.Processor):
         match self._out_type:
             case IoType.DISPATCH:
                 out_names = [None]
-                out_fmt_str = f"u{clog2(self._network.num_outputs() + 1)}"
+                out_fmt_str = f"u{unsigned_width(self._network.num_outputs())}"
             case IoType.STREAM:
                 out_names = list(range(self._network.num_outputs()))
                 out_fmt_str = "".join("b1" for _ in range(self._network.num_outputs()))

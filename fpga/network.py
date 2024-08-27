@@ -8,29 +8,51 @@ import pathlib as pl
 import re
 from hashlib import sha256
 from json import dumps
-from math import ceil, log2, log10
+from math import ceil, log10
 from warnings import warn
 
 import neuro
 
 import fpga
+from fpga._math import signed_width
 
 HASH_LEN = 10
 
 
 def charge_width(net: neuro.Network) -> int:
     proc_params = proc_params_dict(net)
-    return int(
-        ceil(
-            log2(
-                max(
-                    abs(proc_params["max_weight"] + 1),  # +1 for perfect powers of 2
-                    abs(proc_params["min_weight"]),
-                )
-            )
-        )
-        + 1  # +1 for the sign bit
+    weight_width = max(
+        [
+            signed_width(weight)
+            for weight in [
+                proc_params["min_weight"],
+                proc_params["max_weight"],
+            ]
+        ]
     )
+
+    scaling_width = signed_width(spike_value_factor(net))
+    if scaling_width > weight_width:
+        warn(
+            f"A spike factor of {spike_value_factor(net)}"
+            f" will mandate a network charge width of {scaling_width} bits"
+            f" which is greater than the charge width of {weight_width} bits"
+            " mandated by the weight range"
+            f" [{proc_params['min_weight']}, {proc_params['max_weight']}]."
+            " This will potentially waste hardware resources."
+        )
+
+    return max(weight_width, scaling_width)
+
+
+def spike_value_factor(net: neuro.Network) -> float:
+    proc_params = proc_params_dict(net)
+    svf = float(proc_params["max_weight"])
+    if "spike_value_factor" in proc_params:
+        svf = proc_params["spike_value_factor"]
+    if svf < 1.0:
+        raise ValueError("Spike value factor must be greater than or equal to 1")
+    return svf
 
 
 def proc_params_dict(net: neuro.Network) -> dict:
@@ -102,17 +124,17 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         if ("threshold_inclusive" in proc_params)
         else True
     )
+
+    min_potential = -1 * proc_params["max_threshold"]
     if "min_potential" in proc_params:
-        if proc_params["min_potential"] > 0:
-            raise ValueError("min_potential must be less than or equal to 0")
         min_potential = proc_params["min_potential"]
     elif ("non_negative_charge" in proc_params) and proc_params["non_negative_charge"]:
         warn(
             "non_negative_charge is a deprecated field; set min_potential to 0 instead."
         )
         min_potential = 0
-    else:
-        min_potential = -1 * proc_params["max_threshold"]
+    if min_potential > 0:
+        raise ValueError("min_potential must be less than or equal to 0")
 
     leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
     match (leak_mode):
@@ -147,6 +169,12 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
         )
         if node.input_id > -1:
+            if (thresh(node) + int(not thresh_incl)) > spike_value_factor(net):
+                warn(
+                    f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
+                    f" of {thresh(node)} which cannot be solely triggered by an"
+                    f" input scaling value of {spike_value_factor(net)}."
+                )
             # use the last indexed port for input to make synapse generation easier
             f.write(
                 f"    assign neur_{node.id:0{neur_id_digits}d}"

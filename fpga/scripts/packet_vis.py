@@ -27,9 +27,9 @@ import fpga._processor
 from fpga._math import (
     bools_to_signed,
     bools_to_unsigned,
-    clog2,
     signed_to_bools,
     unsigned_to_bools,
+    unsigned_width,
     width_padding_to_byte,
 )
 from fpga._processor import (
@@ -690,7 +690,7 @@ def update_sink_table(interfaces, sink_type_str, net_num_out):
 
     match out_type:
         case IoType.DISPATCH:
-            idx_width = clog2(net_num_out + 1)
+            idx_width = unsigned_width(net_num_out)
             padding = (
                 width_padding_to_byte(idx_width) if "AXI Stream" in interfaces else 0
             )

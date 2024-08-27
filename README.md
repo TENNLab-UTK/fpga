@@ -157,7 +157,7 @@ net.read_from_file("networks/simple.txt")
 proc = fpga.Processor("basys3", "/dev/ttyUSB1", "DIDO")
 proc.load_network(net)
 
-proc.apply_spikes([neuro.Spike(0, i, 9) for i in range(3)])
+proc.apply_spikes([neuro.Spike(0, i, 1.0) for i in range(3)])
 proc.run(6)
 print(proc.output_last_fire(0))
 ```
@@ -179,6 +179,8 @@ To run it, simply follow the instructions in [Framework (required)](#framework) 
 ## ✍️ Authors <a name = "authors"></a>
 
 - [@keegandent](https://github.com/keegandent) - Idea & initial work
+- [@Bgull00](https://github.com/bgull00) - DMA interface (under construction)
+
 
 See also the list of [contributors](https://github.com/TENNLab-UTK/fpga/graphs/contributors) who participated in this project.
 
@@ -190,5 +192,6 @@ See also the list of [contributors](https://github.com/TENNLab-UTK/fpga/graphs/c
     - Dr. Garrett Rose
     - Dr. Charles Rizzo
     - Bryson Gullett
+    - Anna Weis
 - [@alexforencich](https://github.com/alexforencich) for great examples of designs using using cocotb as well as various AXI4-Stream components modified for use in this project
 - [@WillGreen](https://github.com/WillGreen) for his amazing tutorials on [projectf.io](https://projectf.io/tutorials/)
