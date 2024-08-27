@@ -12,7 +12,7 @@ from cocotb.triggers import Timer
 from cocotb_test.simulator import run
 
 from fpga import rtl, sims_build_path
-from fpga.network import build_network_sv, proc_params_dict
+from fpga.network import build_network_sv, proc_name
 
 
 async def reset(arstn, period: float = 2) -> None:
@@ -33,7 +33,7 @@ def runner(
 
     rtl_path = pl.Path(resources.files(rtl))
 
-    proc = proc_params_dict(network)["proc_name"]
+    proc = proc_name(network)
 
     lesser_modules = [
         f"{proc}_neuron",
