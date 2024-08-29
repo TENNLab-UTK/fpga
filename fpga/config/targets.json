@@ -24,5 +24,20 @@
                 "pgm": "vivado"
             }
         }
+    },
+    "c5g": {
+        "default_tool": "quartus",
+        "parameters": {
+            "clk_freq": 50000000.0,
+            "uart": {
+                "baud_rates": []
+            }
+        },
+        "tools": {
+            "quartus": {
+                "family": "Cyclone V",
+                "device": "5CGXFC5C6F27C7"
+            }
+        }
     }
 }
