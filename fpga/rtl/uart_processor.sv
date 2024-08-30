@@ -32,7 +32,7 @@ module uart_processor #(
     logic rx_frame_error, rx_overrun_error;
 
     logic [15:0] prescale;
-    assign prescale = int'($floor(CLK_FREQ / real'(UART_WIDTH * BAUD_RATE)));
+    assign prescale = int'(CLK_FREQ / real'(UART_WIDTH * BAUD_RATE));
 
     uart #(
         .DATA_WIDTH(UART_WIDTH)
