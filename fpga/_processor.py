@@ -418,6 +418,15 @@ class Processor(neuro.Processor):
                 ]
             )
 
+        files.append(
+            {
+                "name": str(
+                    config_path / f"{self._target_name}" / "uart_processor_top.v"
+                ),
+                "file_type": "verilogSource",
+            }
+        )
+
         edam = {
             "files": files,
             "name": f"{nethash}",

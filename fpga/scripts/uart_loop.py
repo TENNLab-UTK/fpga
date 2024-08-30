@@ -122,6 +122,12 @@ def main():
             ]
         ]
     )
+    files.append(
+        {
+            "name": str(config_path / f"{args.target}" / "uart_processor_top.v"),
+            "file_type": "verilogSource",
+        }
+    )
 
     tool_options = target_config["tools"]
     tool = target_config["default_tool"]
@@ -129,19 +135,11 @@ def main():
 
     if tool == "vivado":
         tool_options["vivado"]["source_mgmt_mode"] = "All"
-        files.extend(
-            [
-                {
-                    "name": str(
-                        config_path / f"{args.target}" / "uart_processor_top.v"
-                    ),
-                    "file_type": "verilogSource",
-                },
-                {
-                    "name": str(config_path / f"{args.target}" / f"{args.target}.xdc"),
-                    "file_type": "xdc",
-                },
-            ]
+        files.append(
+            {
+                "name": str(config_path / f"{args.target}" / f"{args.target}.xdc"),
+                "file_type": "xdc",
+            }
         )
 
     def build_eda(rate: int):
