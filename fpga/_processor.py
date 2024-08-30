@@ -352,15 +352,24 @@ class Processor(neuro.Processor):
         files.extend(
             [
                 {
+                    "name": str(rtl_path / f"{module}.v"),
+                    "file_type": "verilogSource",
+                }
+                for module in [
+                    "axis_adapter",
+                    "axis_uart",
+                ]
+            ]
+        )
+        files.extend(
+            [
+                {
                     "name": str(rtl_path / f"{module}.sv"),
                     "file_type": "systemVerilogSource",
                 }
                 for module in [
                     f"{self._inp_type.name.lower()}_source",
                     f"{self._out_type.name.lower()}_sink",
-                    "axis_if",
-                    "axis_adapter",
-                    "axis_uart",
                     "axis_processor",
                     "uart_processor",
                 ]
