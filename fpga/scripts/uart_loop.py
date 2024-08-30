@@ -92,14 +92,24 @@ def main():
     files.extend(
         [
             {
+                "name": str(rtl_path / f"{module}.v"),
+                "file_type": "verilogSource",
+            }
+            for module in [
+                "axis_adapter",
+                "axis_uart",
+            ]
+        ]
+    )
+    files.extend(
+        [
+            {
                 "name": str(rtl_path / f"{module}.sv"),
                 "file_type": "systemVerilogSource",
             }
             for module in [
-                "axis_adapter",
-                "axis_if",
-                "axis_uart",
-                "uart_loopback",
+                "axis_loop_proc",
+                "uart_processor",
             ]
         ]
     )
@@ -203,6 +213,10 @@ def main():
         print("UART LOOPBACK END".center(os.get_terminal_size().columns, "-"))
         print(f"TESTED  BAUD RATE {rate}".center(os.get_terminal_size().columns, "="))
         print("")
+        if (rate == RATES[0]) and not passing:
+            print(
+                f"TEST FAILED: Failure at standard rate of {rate}. Higher baud rates will not be tested."
+            )
 
     pass_rates = sorted(throughputs.keys())
     print("")

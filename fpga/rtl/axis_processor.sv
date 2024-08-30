@@ -22,8 +22,12 @@ import processor_config::*;
 module axis_processor (
     input logic clk,
     input logic arstn,
-    axis.s s_axis,
-    axis.m m_axis
+    input logic [INP_WIDTH-1:0] s_axis_tdata,
+    input logic s_axis_tvalid,
+    output logic s_axis_tready,
+    output logic [OUT_WIDTH-1:0] m_axis_tdata,
+    output logic m_axis_tvalid,
+    input logic m_axis_tready
 );
     logic net_valid, net_ready, net_out;
 
@@ -32,9 +36,9 @@ module axis_processor (
     ) source (
         .clk,
         .arstn,
-        .src_valid(s_axis.tvalid),
-        .src_ready(s_axis.tready),
-        .src(s_axis.tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
+        .src_valid(s_axis_tvalid),
+        .src_ready(s_axis_tready),
+        .src(s_axis_tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
         .net_ready,
         .net_valid
     );
@@ -53,12 +57,12 @@ module axis_processor (
         .net_valid,
         .net_ready,
         .net_out,
-        .snk_ready(m_axis.tready),
-        .snk_valid(m_axis.tvalid)
+        .snk_ready(m_axis_tready),
+        .snk_valid(m_axis_tvalid)
     );
 
     always_comb begin : calc_m_axis_tdata
-        m_axis.tdata[OUT_WIDTH-1:0] = 0;
-        m_axis.tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = sink.snk;
+        m_axis_tdata[OUT_WIDTH-1:0] = 0;
+        m_axis_tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = sink.snk;
     end
 endmodule
