@@ -31,8 +31,12 @@ module uart_processor #(
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
     logic rx_frame_error, rx_overrun_error;
 
+    // This looks like odd code for a simple integer division, however
+    // 1. Vivado does not seem to truncate but ROUND decimals by default, so the solution would be $floor or $rtoi
+    // 2. Except Quartus won't synthesize code that uses $floor or $rtoi in even localparam math -_-
+    localparam int PRESCALE = (CLK_FREQ / real'(UART_WIDTH * BAUD_RATE) - 0.5);
     logic [15:0] prescale;
-    assign prescale = int'(CLK_FREQ / real'(UART_WIDTH * BAUD_RATE));
+    assign prescale = PRESCALE;
 
     uart #(
         .DATA_WIDTH(UART_WIDTH)
