@@ -35,8 +35,10 @@
         },
         "tools": {
             "quartus": {
+                "cable": "USB-Blaster",
                 "family": "Cyclone V",
-                "device": "5CGXFC5C6F27C7"
+                "device": "5CGXFC5C6F27C7",
+                "pgm": "quartus"
             }
         }
     }

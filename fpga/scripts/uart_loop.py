@@ -141,6 +141,19 @@ def main():
                 "file_type": "xdc",
             }
         )
+    elif tool == "quartus":
+        files.extend(
+            [
+                {
+                    "name": str(config_path / f"{args.target}" / f"{args.target}.qsf"),
+                    "file_type": "QSF",
+                },
+                {
+                    "name": str(config_path / f"{args.target}" / f"{args.target}.sdc"),
+                    "file_type": "SDC",
+                },
+            ]
+        )
 
     def build_eda(rate: int):
         proj_path = proj_path_parent / f"{rate:07d}"
