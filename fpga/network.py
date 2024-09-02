@@ -88,8 +88,9 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
 
-    if "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]:
-        raise NotImplementedError("RAVENS firing pattern is not yet supported.")
+    fire_like_ravens = (
+        "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]
+    )
 
     f.write(f"package network{suffix}_config;\n")
     f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
@@ -189,7 +190,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
         f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
         f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
-        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)})\n")
+        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
+        f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
@@ -228,7 +230,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f.write(f"    risp_synapse #(\n")
             f.write(f"        .WEIGHT({weight(inp)}),\n")
             f.write(f"        .DELAY({delay(inp)}),\n")
-            f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH)\n")
+            f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
+            f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
             f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
             f.write(f"        .clk,\n")
             f.write(f"        .arstn,\n")
