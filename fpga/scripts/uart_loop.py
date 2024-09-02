@@ -146,7 +146,7 @@ def main():
             [
                 {
                     "name": str(config_path / f"{args.target}" / f"{args.target}.qsf"),
-                    "file_type": "QSF",
+                    "file_type": "tclSource",
                 },
                 {
                     "name": str(config_path / f"{args.target}" / f"{args.target}.sdc"),
