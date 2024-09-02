@@ -263,14 +263,13 @@ set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 set argv0 $origin_dir/pynq_dma_bd.tcl
 source $argv0
 
-# Generate the wrapper
+# Generate the block design Verilog wrapper that is set as top
 set design_name [get_bd_designs]
 make_wrapper -files [get_files $design_name.bd] -top -import
+update_compile_order -fileset sources_1
+set_property top pynq_dma_wrapper [current_fileset]
+update_compile_order -fileset sources_1
 
-generate_target all [get_files pynq_dma.bd]
-
-launch_runs synth_1 -jobs 8
-wait_on_run synth_1
-
+# Run synthesis, implementation, and generate bitstream
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_run impl_1
