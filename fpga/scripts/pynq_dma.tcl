@@ -26,28 +26,28 @@
 #
 # 3. The following remote source files that were added to the original project:-
 #
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_if.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_packetize.sv"
-#    "/home/bryson/Desktop/xor_noleak.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/macros.svh"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/stream_source.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/stream_sink.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_processor.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_processor_tlast.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_processor_tlast_v_sv_adapter.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/risp_neuron.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/risp_synapse.sv"
-#    "/home/bryson/Documents/TENNLab/framework/fpga/fpga/rtl/axis_processor_tlast_top.v"
+#    "fpga/fpga/rtl/axis_if.sv"
+#    "fpga/fpga/rtl/axis_packetize.sv"
+#    SysteVerilog network file that is auto-generated
+#    "fpga/fpga/rtl/macros.svh"
+#    "fpga/fpga/rtl/stream_source.sv"
+#    "fpga/fpga/rtl/stream_sink.sv"
+#    "fpga/fpga/rtl/axis_processor.sv"
+#    "fpga/fpga/rtl/axis_processor_tlast.sv"
+#    "fpga/fpga/rtl/axis_processor_tlast_v_sv_adapter.sv"
+#    "fpga/fpga/rtl/risp_neuron.sv"
+#    "fpga/fpga/rtl/risp_synapse.sv"
+#    "fpga/fpga/rtl/axis_processor_tlast_top.v"
 #
 #*****************************************************************************************
 
 # Check file required for this script exists
-proc checkRequiredFiles { origin_dir } {
+proc checkRequiredFiles { origin_dir net_sv_path } {
   set status true
   set files [list \
  "[file normalize "$origin_dir/../rtl/axis_if.sv"]"\
  "[file normalize "$origin_dir/../rtl/axis_packetize.sv"]"\
- "[file normalize "$origin_dir/../../../../../../Desktop/xor_noleak.sv"]"\
+ "[file normalize "$net_sv_path"]"\
  "[file normalize "$origin_dir/../rtl/macros.svh"]"\
  "[file normalize "$origin_dir/../rtl/stream_source.sv"]"\
  "[file normalize "$origin_dir/../rtl/stream_sink.sv"]"\
@@ -97,7 +97,8 @@ proc print_help {} {
   puts "runs, adding/importing sources and setting properties on various objects.\n"
   puts "Syntax:"
   puts "$script_file"
-  puts "$script_file -tclargs \[--origin_dir <path>\]"
+  puts "$script_file -tclargs \[--net_sv_path <path>\]"
+  puts "$script_file -tclargs \[--project_dir <path>\]"
   puts "$script_file -tclargs \[--project_name <name>\]"
   puts "$script_file -tclargs \[--inp_pkt_width_bits <int>\]"
   puts "$script_file -tclargs \[--out_pkt_width_bits <int>\]"
@@ -105,13 +106,17 @@ proc print_help {} {
   puts "Usage:"
   puts "Name                   Description"
   puts "-------------------------------------------------------------------------"
-  puts "\[--origin_dir <path>\]  Determine source file paths wrt this path. Default"
-  puts "                       origin_dir path value is \".\", otherwise, the value"
-  puts "                       that was set with the \"-paths_relative_to\" switch"
-  puts "                       when this script was generated.\n"
+  puts "\[--net_sv_path <path>\]  REQUIRED. Path to network SystemVerilog file"
+  puts "                        that was auto-generated.\n"
+  puts "\[--project_dir <path>\]  REQUIRED. Path to directory where Vivado project"
+  puts "                        should be created.\n"
   puts "\[--project_name <name>\] Create project with the specified name. Default"
   puts "                       name is the name of the project from where this"
   puts "                       script was generated.\n"
+  puts "\[--inp_pkt_width_bits <int>\] Number of bits in one neuro FPGA input"
+  puts "                       packet. Default is 16 bits.\n"
+  puts "\[--out_pkt_width_bits <int>\] Number of bits in one neuro FPGA output"
+  puts "                       packet. Default is 16 bits.\n"
   puts "\[--help\]               Print help information for this script"
   puts "-------------------------------------------------------------------------\n"
   exit 0
@@ -121,7 +126,8 @@ if { $::argc > 0 } {
   for {set i 0} {$i < $::argc} {incr i} {
     set option [string trim [lindex $::argv $i]]
     switch -regexp -- $option {
-      "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
+      "--net_sv_path"   { incr i; set net_sv_path [lindex $::argv $i] }
+      "--project_dir"   { incr i; set project_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
       "--inp_pkt_width_bits"  { incr i; set inp_pkt_width_bits [lindex $::argv $i] }
       "--out_pkt_width_bits"  { incr i; set out_pkt_width_bits [lindex $::argv $i] }
@@ -136,10 +142,30 @@ if { $::argc > 0 } {
   }
 }
 
+if { [info exists net_sv_path] == 0 } {
+  puts "ERROR: Must specify --net_sv_path with the path to a valid network SystemVerilog file that was auto-generated.\n"
+  return 1
+}
+
+if { [file exists $net_sv_path] == 0 } {
+  puts "ERROR: Given --net_sv_path, $net_sv_path, is not a path to a valid file.\n"
+  return 1
+}
+
+if { [info exists project_dir] == 0 } {
+  puts "ERROR: Must specify --project_dir with the path to a valid directory.\n"
+  return 1
+}
+
+if { [file exists $project_dir] == 0 || [file isdirectory $project_dir] == 0 } {
+  puts "ERROR: Given --project_dir, $project_dir, is not a path to a valid directory.\n"
+  return 1
+}
+
 # Check for paths and files needed for project creation
 set validate_required 1
 if { $validate_required } {
-  if { [checkRequiredFiles $origin_dir] } {
+  if { [checkRequiredFiles $origin_dir $net_sv_path] } {
     puts "Tcl file $script_file is valid. All files required for project creation is accesable. "
   } else {
     puts "Tcl file $script_file is not valid. Not all files required for project creation is accesable. "
@@ -148,7 +174,7 @@ if { $validate_required } {
 }
 
 # Create project
-create_project ${_xil_proj_name_} $origin_dir/tmp_tcl_test/${_xil_proj_name_} -part xc7z020clg400-1
+create_project ${_xil_proj_name_} $project_dir -part xc7z020clg400-1
 
 # Set the directory path for the new project
 set proj_dir [get_property directory [current_project]]
@@ -190,7 +216,7 @@ set obj [get_filesets sources_1]
 set files [list \
  [file normalize "${origin_dir}/../rtl/axis_if.sv"] \
  [file normalize "${origin_dir}/../rtl/axis_packetize.sv"] \
- [file normalize "${origin_dir}/../../../../../../Desktop/xor_noleak.sv"] \
+ [file normalize "${net_sv_path}"] \
  [file normalize "${origin_dir}/../rtl/macros.svh"] \
  [file normalize "${origin_dir}/../rtl/stream_source.sv"] \
  [file normalize "${origin_dir}/../rtl/stream_sink.sv"] \
@@ -214,7 +240,7 @@ set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
-set file "$origin_dir/../../../../../../Desktop/xor_noleak.sv"
+set file "$net_sv_path"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
@@ -260,6 +286,8 @@ set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 # Create block design
+set argv [list "--inp_pkt_width_bits" "$inp_pkt_width_bits" "--out_pkt_width_bits" "$out_pkt_width_bits"]
+set argc [llength $argv]
 set argv0 $origin_dir/pynq_dma_bd.tcl
 source $argv0
 
