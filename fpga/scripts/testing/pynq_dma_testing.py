@@ -1,11 +1,14 @@
 import neuro
 import subprocess
 import pathlib as pl
-from fpga.network import build_network_sv
+from fpga.network import build_network_sv, charge_width
+from fpga._math import clog2, width_bits_to_bytes, width_bytes_to_bits, width_nearest_byte
 
-def build_network_sv_from_file(net_path: str = "", net_sv_path: str = "") -> None:
+def width_nearest_pow2_bits(w) -> int:
+    return width_bytes_to_bits(1 << clog2(width_bits_to_bytes(w)))
+
+def build_network_sv_from_file(net_path: str = "", net_sv_path: str = "") -> neuro.Network:
     net_fpath = pl.Path(net_path)
-
     if not net_fpath.is_file():
         raise RuntimeError("build_network_sv_from_file() - The given network path, " + str(net_path) + ", is not a valid file path.")
 
@@ -13,6 +16,8 @@ def build_network_sv_from_file(net_path: str = "", net_sv_path: str = "") -> Non
     net.read_from_file(net_path)
 
     build_network_sv(net, net_sv_path)
+
+    return net
 
 def gen_bitstream(net_sv_path: str = "", vivado_dir_path: str = "", inp_width_bits: int = 16, out_width_bits: int = 16) -> int:
     vivado_dir_fpath = pl.Path(vivado_dir_path)
@@ -33,19 +38,41 @@ def gen_bitstream(net_sv_path: str = "", vivado_dir_path: str = "", inp_width_bi
 
     return result.returncode
 
-if __name__=="__main__":
+def process_network(net_path: str = "") -> int:
 
     this_script_fpath = pl.Path(__file__).resolve()
     if "pynq_dma_testing.py" not in str(this_script_fpath):
-        raise RuntimeError("gen_bitstream() - Could not resolve the file path for this Python script.")
+        raise RuntimeError("process_network() - Could not resolve the file path for this Python script.")
     
     tmp_dir_fpath = pl.Path(str(this_script_fpath.parent) + "/tmp_test")
     if not tmp_dir_fpath.is_dir():
         tmp_dir_fpath.mkdir(parents=True, exist_ok=True)
     
-    net_sv_path = str(tmp_dir_fpath) + "/xor_noleak.sv"
-    build_network_sv_from_file(str(this_script_fpath.parent) + "/../../../networks/xor_noleak.txt", net_sv_path)
-    result = gen_bitstream(net_sv_path, str(tmp_dir_fpath), 8, 8)
+    net_fpath = pl.Path(net_path)
+    if not net_fpath.is_file():
+        raise RuntimeError("process_network() - The given network path, " + str(net_path) + ", is not a valid file path.")
+
+    net_sv_path = str(tmp_dir_fpath) + "/" + net_fpath.stem + ".sv"
+    net = build_network_sv_from_file(net_path, net_sv_path)
+
+    spk_width = net.num_inputs() * charge_width(net)
+    run_width = width_nearest_byte(spk_width + 1) - 1
+    src_width = 1 + max(spk_width, run_width)
+    inp_width_bits = width_nearest_pow2_bits(src_width)
+    out_width_bits = width_nearest_pow2_bits(net.num_outputs() + 1)
+
+    result = gen_bitstream(net_sv_path, str(tmp_dir_fpath), inp_width_bits, out_width_bits)
+    
+    return result
+
+
+if __name__=="__main__":
+
+    this_script_fpath = pl.Path(__file__).resolve()
+    if "pynq_dma_testing.py" not in str(this_script_fpath):
+        raise RuntimeError("main() - Could not resolve the file path for this Python script.")
+    
+    result = process_network(str(this_script_fpath.parent) + "/../../../networks/xor_noleak.txt")
 
     if result == 0:
         print("Successful bitstream generation")
