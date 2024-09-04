@@ -860,6 +860,8 @@ proc create_root_design { parentCell inp_pkt_width_bits out_pkt_width_bits } {
 
 
   # Create instance: axis_processor_tlast_0, and set properties
+  set inp_tdata_width_bytes [expr $inp_pkt_width_bits / 8]
+  set out_tdata_width_bytes [expr $out_pkt_width_bits / 8]
   set block_name axis_processor_tlast_top
   set block_cell_name axis_processor_tlast_0
   if { [catch {set axis_processor_tlast_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
@@ -870,8 +872,8 @@ proc create_root_design { parentCell inp_pkt_width_bits out_pkt_width_bits } {
      return 1
    }
     set_property -dict [list \
-    CONFIG.INP_TDATA_WIDTH_BYTES {1} \
-    CONFIG.OUT_TDATA_WIDTH_BYTES {1} \
+    CONFIG.INP_TDATA_WIDTH_BYTES $inp_tdata_width_bytes \
+    CONFIG.OUT_TDATA_WIDTH_BYTES $out_tdata_width_bytes \
   ] $axis_processor_tlast_0
 
 
