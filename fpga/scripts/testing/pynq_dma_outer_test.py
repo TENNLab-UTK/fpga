@@ -1,5 +1,3 @@
-import os
-import shutil
 import pathlib as pl
 
 from network_gen import generate_network
@@ -33,7 +31,7 @@ def test_pynq_dma(test_id, num_neurons, num_synapses, num_inputs, num_outputs, n
     # Generate random network input in the form of processor tool commands that are written to a file
     proc_tool_commands_fpath = pl.Path(str(test_dir_fpath) + "/proc_tool_commands.txt")
     proc_tool_output_fires_fpath = pl.Path(str(test_dir_fpath) + "/proc_tool_output_fires.txt")
-    gen_inputs(str(rand_net_json_fpath), str(framework_fpath), str(proc_tool_commands_fpath), num_sim_times, sim_time, str(proc_tool_output_fires_fpath))
+    gen_inputs(str(rand_net_json_fpath), str(framework_fpath), str(proc_tool_commands_fpath), num_sim_times, sim_time, test_id, str(proc_tool_output_fires_fpath))
 
     # Generate network SystemVerilog and then bitstream for random network with PYNQ-Z1+petalinux target
     process_network(str(rand_net_json_fpath), str(test_dir_fpath))

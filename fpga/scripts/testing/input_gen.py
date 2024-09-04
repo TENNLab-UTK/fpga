@@ -14,7 +14,11 @@ PROB_INPUT_AS_TIMESTEP = 0.1
 
 
 # Randomly generate inputs to SNN in form of processor tool commands, write processor tool commands out to a file, simulate SNN with processor toool command inputs, and write out processor tool command outputs to a file
-def gen_inputs(net_json_path: str, framework_path: str, output_proc_tool_cmds_path: str, num_sim_times: int, sim_time: int, proc_tool_output_times_path: str) -> None:
+def gen_inputs(net_json_path: str, framework_path: str, output_proc_tool_cmds_path: str, num_sim_times: int, sim_time: int, seed: int, proc_tool_output_times_path: str) -> None:
+
+    # Seed random number generator
+    np.random.seed(seed)
+    random.seed(seed)
 
     # Error check path to the network JSON file
     net_path = net_json_path
@@ -146,8 +150,4 @@ if __name__ == '__main__':
     parser.add_argument("--seed", "-s", type=int, default=0, help="Seed for random number generation")
     args = parser.parse_args()
 
-    # Seed random number generator
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-
-    gen_inputs(args.net_json_path, args.framework_path, args.output_proc_tool_cmds_path, args.num_sim_times, args.sim_time, args.proc_tool_output_times_path)
+    gen_inputs(args.net_json_path, args.framework_path, args.output_proc_tool_cmds_path, args.num_sim_times, args.sim_time, args.seed, args.proc_tool_output_times_path)

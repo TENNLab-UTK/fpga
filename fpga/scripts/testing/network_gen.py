@@ -56,6 +56,7 @@ def make_network(template_net_json_path: str, framework_path: str, num_neurons: 
     networktool = subprocess.Popen([network_tool_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
     # Load network template into the network tool
+    networktool.stdin.write(f'SEED {seed}\n'.encode())
     networktool.stdin.write(f'FJ tmp_net.json\n'.encode())
     networktool.stdin.flush()
 
