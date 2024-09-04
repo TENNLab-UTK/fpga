@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 from importlib import resources
 from json import dump, load
 
-from edalize.edatool import get_edatool
+from edalize.edatool import get_edatool, run
 from periphery import Serial
 from tqdm import tqdm
 
@@ -36,6 +36,8 @@ RATES = [
     3500000,
     4000000,
 ]
+
+JTAG_TRIES = 3
 
 
 def main():
@@ -213,7 +215,21 @@ def main():
             )
             print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
             if tool == "quartus":
-                backend._run_tool("jtagconfig")
+                print("Verifying JTAG chain is available.")
+                # HACK: Intel's jtagd is like a really old ICE engine.
+                # It has to be beaten with a wrench a few times to get started
+                success = False
+                tries = 0
+                while not success and (tries < JTAG_TRIES):
+                    tries += 1
+                    print(f"Attempt {tries} of {JTAG_TRIES}")
+                    cp = run("jtagconfig", capture_output=True)
+                    out = cp.stdout.decode()
+                    success = "Unable to lock chain" not in out
+                if not success:
+                    raise RuntimeError("Failed to connect to JTAG chain.\n" + out)
+                print("JTAG chain available.")
+                print(out)
 
             backend.run()
             print("PROGRAMMING END".center(os.get_terminal_size().columns, "-"))
