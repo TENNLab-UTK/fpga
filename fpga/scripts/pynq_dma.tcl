@@ -301,3 +301,6 @@ update_compile_order -fileset sources_1
 # Run synthesis, implementation, and generate bitstream
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_run impl_1
+
+# Report utilization
+report_utilization -file utilization.txt
