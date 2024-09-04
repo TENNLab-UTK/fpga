@@ -29,10 +29,10 @@ def gen_bitstream(net_sv_path: str = "", vivado_dir_path: str = "", inp_width_bi
     if "pynq_dma_hw_gen.py" not in str(this_script_fpath):
         raise RuntimeError("gen_bitstream() - Could not resolve the file path for this Python script.")
 
-    with open(str(vivado_dir_fpath.parent) + "/gen_bitstream.tcl", 'w') as tcl_f:
+    with open(str(vivado_dir_fpath) + "/gen_bitstream.tcl", 'w') as tcl_f:
         tcl_f.write('''set argv [list "--net_sv_path" "''' + net_sv_path + '''" "--project_dir" "''' + vivado_dir_path + '''" "--inp_pkt_width_bits" "''' + str(inp_width_bits) + '''" "--out_pkt_width_bits" "''' + str(out_width_bits) + '''"]\nset argc [llength $argv]\nset argv0 [file join [file dirname [info script]] ''' + str(this_script_fpath.parent) + '''/../pynq_dma.tcl]\nsource $argv0\n''')
 
-    bash_cmd = "vivado -mode batch -source " + str(vivado_dir_fpath.parent) + "/gen_bitstream.tcl"
+    bash_cmd = "vivado -mode batch -source " + str(vivado_dir_fpath) + "/gen_bitstream.tcl"
 
     result = subprocess.run(bash_cmd.split(' '), cwd=vivado_dir_path)
 
