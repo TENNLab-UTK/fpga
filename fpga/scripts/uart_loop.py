@@ -212,6 +212,9 @@ def main():
                 f"TESTING BAUD RATE {rate}".center(os.get_terminal_size().columns, "=")
             )
             print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
+            if tool == "quartus":
+                backend._run_tool("jtagconfig")
+
             backend.run()
             print("PROGRAMMING END".center(os.get_terminal_size().columns, "-"))
 
