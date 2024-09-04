@@ -44,6 +44,7 @@ dependencies = [
     "python-periphery",
     "tqdm",
     "waitress",
+    "rustworkx",
 ]
 
 [project.scripts]
