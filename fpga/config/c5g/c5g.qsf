@@ -813,19 +813,6 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name QIP_FILE HDMI_QSYS/synthesis/HDMI_QSYS.qip
-set_global_assignment -name QIP_FILE mem_init/meminit.qip
-set_global_assignment -name QIP_FILE V/Audio_PLL.qip
-set_global_assignment -name VERILOG_FILE V/SEG7_LUT_4.v
-set_global_assignment -name VERILOG_FILE V/SEG7_LUT.v
-set_global_assignment -name VERILOG_FILE V/Reset_Delay.v
-set_global_assignment -name VERILOG_FILE V/I2C_Controller.v
-set_global_assignment -name VERILOG_FILE V/I2C_AV_Config.v
-set_global_assignment -name VERILOG_FILE V/AUDIO_DAC.v
-set_global_assignment -name VERILOG_FILE V/hdmi_controller.v
-set_global_assignment -name VERILOG_FILE V/img_data.v
-set_global_assignment -name VERILOG_FILE V/video_sync_generator.v
-set_global_assignment -name VERILOG_FILE V/img_index.v
 set_global_assignment -name OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
 set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X4"
@@ -837,7 +824,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
-set_global_assignment -name SDC_FILE c5g.sdc
 set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
