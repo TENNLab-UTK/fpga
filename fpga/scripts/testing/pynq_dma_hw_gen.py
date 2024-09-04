@@ -26,7 +26,7 @@ def gen_bitstream(net_sv_path: str = "", vivado_dir_path: str = "", inp_width_bi
         vivado_dir_fpath.mkdir(parents=True, exist_ok=True)
 
     this_script_fpath = pl.Path(__file__).resolve()
-    if "pynq_dma_testing.py" not in str(this_script_fpath):
+    if "pynq_dma_hw_gen.py" not in str(this_script_fpath):
         raise RuntimeError("gen_bitstream() - Could not resolve the file path for this Python script.")
 
     with open(str(vivado_dir_fpath.parent) + "/gen_bitstream.tcl", 'w') as tcl_f:
@@ -40,7 +40,7 @@ def gen_bitstream(net_sv_path: str = "", vivado_dir_path: str = "", inp_width_bi
 
 def process_network(net_path: str = "", vivado_dir_path: str = "") -> int:
     this_script_fpath = pl.Path(__file__).resolve()
-    if "pynq_dma_testing.py" not in str(this_script_fpath):
+    if "pynq_dma_hw_gen.py" not in str(this_script_fpath):
         raise RuntimeError("process_network() - Could not resolve the file path for this Python script.")
     
     vivado_dir_fpath = pl.Path(vivado_dir_path)
@@ -68,7 +68,7 @@ def process_network(net_path: str = "", vivado_dir_path: str = "") -> int:
 if __name__=="__main__":
 
     this_script_fpath = pl.Path(__file__).resolve()
-    if "pynq_dma_testing.py" not in str(this_script_fpath):
+    if "pynq_dma_hw_gen.py" not in str(this_script_fpath):
         raise RuntimeError("main() - Could not resolve the file path for this Python script.")
     
     result = process_network(str(this_script_fpath.parent) + "/../../../networks/xor_noleak.txt", str(this_script_fpath.parent) + "/tmp_pynq_dma_hw_gen_test")
