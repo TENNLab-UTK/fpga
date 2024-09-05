@@ -44,9 +44,9 @@ def build_eda(
     tool: str,
     tool_options: dict,
     files,
-    proj_path_base: pl.Path,
+    proj_path_parent: pl.Path,
 ):
-    proj_path = proj_path_base / f"{rate :07d}"
+    proj_path = proj_path_parent / f"{rate :07d}"
     proj_path.mkdir(parents=True, exist_ok=True)
     print(f"Compiling baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}")
     parameters = {
@@ -89,6 +89,13 @@ def main():
         "dev", type=pl.Path, help="cdev path for UART (e.g. '/dev/ttyS1')"
     )
     parser.add_argument(
+        "-j",
+        dest="jobs",
+        type=int,
+        default=4,
+        help="Number of parallel jobs to run (defaults to 4)",
+    )
+    parser.add_argument(
         "-n",
         dest="num_bytes",
         type=int,
@@ -117,18 +124,18 @@ def main():
     with open(config_fname) as f:
         target_config = load(f)[args.target]
 
-    proj_path_base = fpga.eda_build_path / args.target / "uart" / "loop"
+    proj_path_parent = fpga.eda_build_path / args.target / "uart" / "loop"
 
     rtl_path = ".." / pl.Path(
         os.path.relpath(
             (pl.Path(resources.files(fpga.rtl))).resolve(),
-            start=proj_path_base.resolve(),
+            start=proj_path_parent.resolve(),
         )
     )
     config_path = ".." / pl.Path(
         os.path.relpath(
             (pl.Path(resources.files(fpga.config))).resolve(),
-            start=proj_path_base.resolve(),
+            start=proj_path_parent.resolve(),
         )
     )
 
@@ -181,8 +188,7 @@ def main():
 
     futures = {}
     throughputs = dict()
-    # TODO: calculate based on 1 physical core and 4GB memory per worker
-    with PoolExecutor(max_workers=7) as executor:
+    with PoolExecutor(max_workers=args.jobs) as executor:
         for rate in RATES:
             futures[rate] = executor.submit(
                 build_eda,
@@ -191,9 +197,8 @@ def main():
                 tool,
                 tool_options,
                 files,
-                proj_path_base,
+                proj_path_parent,
             )
-        # build_eda(RATES[0], target_config, tool, tool_options, files, proj_path_base)
 
         for rate in RATES:
             backend = futures[rate].result()
@@ -203,7 +208,6 @@ def main():
                 f"TESTING BAUD RATE {rate}".center(os.get_terminal_size().columns, "=")
             )
             print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
-            # backend.configure()
             backend.run()
             print("PROGRAMMING END".center(os.get_terminal_size().columns, "-"))
 
