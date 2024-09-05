@@ -61,7 +61,7 @@ module network_source #(
     assign net_arstn = (arstn == 0) ? 0 : !(rst_p && !rst_n);
 
     always_comb begin: calc_net_inp
-        foreach (net_inp[i])
+        for (int i = 0; i < NET_NUM_INP; i++)
             net_inp[i] = src[(`SRC_WIDTH - OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
     end
 

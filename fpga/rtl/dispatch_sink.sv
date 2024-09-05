@@ -44,7 +44,8 @@ module network_sink (
     assign snk_valid = (pop_counter == 0) && (snk_counter > 0);
     assign net_ready = (pop_counter == 0) && (snk_counter == 0);
 
-    logic pop_fire = fires[NET_NUM_OUT + 1 - pop_counter];
+    logic pop_fire;
+    assign pop_fire = fires[NET_NUM_OUT + 1 - pop_counter];
 
     always_ff @(posedge clk or negedge arstn) begin: set_pop_counter
         if (arstn == 0) begin
@@ -66,11 +67,11 @@ module network_sink (
 
     always_ff @(posedge clk or negedge arstn) begin: set_snk_stack
         if (arstn == 0) begin
-            foreach (snk_stack[i])
+            for (int i = 0; i <= NET_NUM_OUT; i++)
                 snk_stack[i] <= 0;
         end else begin
             if (net_valid && net_ready) begin
-                foreach (snk_stack[i])
+                for (int i = 0; i <= NET_NUM_OUT; i++)
                     snk_stack[i] <= 0;
             end else if (pop_counter > 0) begin
                 if (pop_counter == 1) begin
