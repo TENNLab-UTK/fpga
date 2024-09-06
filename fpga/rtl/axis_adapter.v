@@ -20,15 +20,11 @@ module axis_adapter #
     // Propagate tkeep signal on input interface
     // If disabled, tkeep assumed to be 1'b1
     parameter S_KEEP_ENABLE = (S_DATA_WIDTH>8),
-    // tkeep signal width (words per cycle) on input interface
-    parameter S_KEEP_WIDTH = ((S_DATA_WIDTH+7)/8),
     // Width of output AXI stream interface in bits
     parameter M_DATA_WIDTH = 8,
     // Propagate tkeep signal on output interface
     // If disabled, tkeep assumed to be 1'b1
     parameter M_KEEP_ENABLE = (M_DATA_WIDTH>8),
-    // tkeep signal width (words per cycle) on output interface
-    parameter M_KEEP_WIDTH = ((M_DATA_WIDTH+7)/8),
     // Propagate tid signal
     parameter ID_ENABLE = 0,
     // tid signal width
@@ -43,56 +39,49 @@ module axis_adapter #
     parameter USER_WIDTH = 1
 )
 (
-    input  wire                     clk,
-    input  wire                     arstn,
+    input  wire                             clk,
+    input  wire                             arstn,
 
     /*
      * AXI input
      */
-    input  wire [S_DATA_WIDTH-1:0]  s_axis_tdata,
-    input  wire [S_KEEP_WIDTH-1:0]  s_axis_tkeep,
-    input  wire                     s_axis_tvalid,
-    output wire                     s_axis_tready,
-    input  wire                     s_axis_tlast,
-    input  wire [ID_WIDTH-1:0]      s_axis_tid,
-    input  wire [DEST_WIDTH-1:0]    s_axis_tdest,
-    input  wire [USER_WIDTH-1:0]    s_axis_tuser,
+    input  wire [S_DATA_WIDTH-1:0]          s_axis_tdata,
+    input  wire [((S_DATA_WIDTH+7)/8)-1:0]  s_axis_tkeep,
+    input  wire                             s_axis_tvalid,
+    output wire                             s_axis_tready,
+    input  wire                             s_axis_tlast,
+    input  wire [ID_WIDTH-1:0]              s_axis_tid,
+    input  wire [DEST_WIDTH-1:0]            s_axis_tdest,
+    input  wire [USER_WIDTH-1:0]            s_axis_tuser,
 
     /*
      * AXI output
      */
-    output wire [M_DATA_WIDTH-1:0]  m_axis_tdata,
-    output wire [M_KEEP_WIDTH-1:0]  m_axis_tkeep,
-    output wire                     m_axis_tvalid,
-    input  wire                     m_axis_tready,
-    output wire                     m_axis_tlast,
-    output wire [ID_WIDTH-1:0]      m_axis_tid,
-    output wire [DEST_WIDTH-1:0]    m_axis_tdest,
-    output wire [USER_WIDTH-1:0]    m_axis_tuser
+    output wire [M_DATA_WIDTH-1:0]          m_axis_tdata,
+    output wire [((M_DATA_WIDTH+7)/8)-1:0]  m_axis_tkeep,
+    output wire                             m_axis_tvalid,
+    input  wire                             m_axis_tready,
+    output wire                             m_axis_tlast,
+    output wire [ID_WIDTH-1:0]              m_axis_tid,
+    output wire [DEST_WIDTH-1:0]            m_axis_tdest,
+    output wire [USER_WIDTH-1:0]            m_axis_tuser
 );
 
-// force keep width to 1 when disabled
-localparam S_BYTE_LANES = S_KEEP_ENABLE ? S_KEEP_WIDTH : 1;
-localparam M_BYTE_LANES = M_KEEP_ENABLE ? M_KEEP_WIDTH : 1;
+localparam S_BYTE_LANES = (S_DATA_WIDTH + 7) / 8;
+localparam M_BYTE_LANES = (M_DATA_WIDTH + 7) / 8;
 
-// bus byte sizes (must be identical)
-localparam S_BYTE_SIZE = S_DATA_WIDTH / S_BYTE_LANES;
-localparam M_BYTE_SIZE = M_DATA_WIDTH / M_BYTE_LANES;
+localparam S_KEEP_WIDTH = S_BYTE_LANES;
+localparam M_KEEP_WIDTH = M_BYTE_LANES;
 
 // bus width assertions
 initial begin
-    if (S_BYTE_SIZE * S_BYTE_LANES != S_DATA_WIDTH) begin
+    if (8 * S_BYTE_LANES != S_DATA_WIDTH) begin
         $error("Error: input data width not evenly divisible (instance %m)");
         $finish;
     end
 
-    if (M_BYTE_SIZE * M_BYTE_LANES != M_DATA_WIDTH) begin
+    if (8 * M_BYTE_LANES != M_DATA_WIDTH) begin
         $error("Error: output data width not evenly divisible (instance %m)");
-        $finish;
-    end
-
-    if (S_BYTE_SIZE != M_BYTE_SIZE) begin
-        $error("Error: byte size mismatch (instance %m)");
         $finish;
     end
 end

@@ -84,7 +84,9 @@ module uart_processor #(
 
     axis_adapter #(
         .S_DATA_WIDTH(UART_WIDTH),
-        .M_DATA_WIDTH(INP_WIDTH)
+        .S_KEEP_ENABLE(0),
+        .M_DATA_WIDTH(INP_WIDTH),
+        .M_KEEP_ENABLE(0)
     )  rx_inp_adapter (
         .clk,
         .arstn,
@@ -98,7 +100,9 @@ module uart_processor #(
 
     axis_adapter #(
         .S_DATA_WIDTH(OUT_WIDTH),
-        .M_DATA_WIDTH(UART_WIDTH)
+        .S_KEEP_ENABLE(0),
+        .M_DATA_WIDTH(UART_WIDTH),
+        .M_KEEP_ENABLE(0)
     ) out_tx_adapter (
         .clk,
         .arstn,

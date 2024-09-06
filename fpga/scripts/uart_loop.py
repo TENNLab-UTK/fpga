@@ -73,8 +73,9 @@ def build_eda(
         backend.stdout = log
         backend.stderr = log
         backend.configure()
-        # # https://github.com/olofk/edalize/issues/423
-        # (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
+        # https://github.com/olofk/edalize/issues/423
+        if tool == "vivado":
+            (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
         backend.build()
     print(f"Completed baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}")
     return backend
@@ -167,9 +168,9 @@ def main():
 
     tool_options = target_config["tools"]
     tool = target_config["default_tool"]
+    tool_options[tool]["include_dirs"] = [str(rtl_path)]
 
     if tool == "vivado":
-        tool_options["vivado"]["include_dirs"] = [str(rtl_path)]
         tool_options["vivado"]["source_mgmt_mode"] = "All"
         files.extend(
             [
