@@ -126,8 +126,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     # end formatting functions
 
-    for n in net.nodes():
-        node = net.get_node(n)
+    net.make_sorted_node_vector()
+    for node in net.sorted_node_vector:
         num_inp_ports = _num_inp_ports(node)
         f.write(f"    // Start Neuron {neur_id(node.id)}\n")
         f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
@@ -177,8 +177,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     def delay(edge: neuro.Edge) -> int:
         return int(edge.values[delay_idx])
 
-    for n in net.nodes():
-        node = net.get_node(n)
+    for node in net.sorted_node_vector:
         for inp_idx in range(len(node.incoming)):
             inp = node.incoming[inp_idx]
             f.write(f"\n")
