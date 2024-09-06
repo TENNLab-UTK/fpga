@@ -821,6 +821,7 @@ proc create_root_design { parentCell inp_pkt_width_bits out_pkt_width_bits } {
   set_property -dict [list \
     CONFIG.c_addr_width {64} \
     CONFIG.c_include_sg {1} \
+    CONFIG.c_sg_include_stscntrl_strm {0} \
     CONFIG.c_m_axi_s2mm_data_width {32} \
     CONFIG.c_m_axis_mm2s_tdata_width $inp_pkt_width_bits \
     CONFIG.c_mm2s_burst_size {32} \
