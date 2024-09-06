@@ -38,49 +38,6 @@ RATES = [
 ]
 
 
-def build_eda(
-    rate: int,
-    target_config: dict,
-    tool: str,
-    tool_options: dict,
-    files,
-    proj_path_parent: pl.Path,
-):
-    proj_path = proj_path_parent / f"{rate :07d}"
-    proj_path.mkdir(parents=True, exist_ok=True)
-    print(f"Compiling baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}")
-    parameters = {
-        "CLK_FREQ": {
-            "datatype": "str",
-            "default": f"{target_config['parameters']['clk_freq']}",
-            "paramtype": "vlogparam",
-        },
-        "BAUD_RATE": {
-            "datatype": "str",
-            "default": f"{rate}",
-            "paramtype": "vlogparam",
-        },
-    }
-    edam = {
-        "files": files,
-        "name": "uart_loop",
-        "parameters": parameters,
-        "toplevel": "uart_top",
-        "tool_options": tool_options,
-    }
-    backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=False)
-    with open(proj_path / "build.log", "w", buffering=1) as log:
-        backend.stdout = log
-        backend.stderr = log
-        backend.configure()
-        # https://github.com/olofk/edalize/issues/423
-        if tool == "vivado":
-            (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
-        backend.build()
-    print(f"Completed baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}")
-    return backend
-
-
 def main():
     parser = argparse.ArgumentParser(
         prog="uart-loop", description="UART Loopback Baud Rate Test"
@@ -187,6 +144,45 @@ def main():
             ]
         )
 
+    def build_eda(rate: int):
+        proj_path = proj_path_parent / f"{rate :07d}"
+        proj_path.mkdir(parents=True, exist_ok=True)
+        print(
+            f"Compiling baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}"
+        )
+        parameters = {
+            "CLK_FREQ": {
+                "datatype": "str",
+                "default": f"{target_config['parameters']['clk_freq']}",
+                "paramtype": "vlogparam",
+            },
+            "BAUD_RATE": {
+                "datatype": "str",
+                "default": f"{rate}",
+                "paramtype": "vlogparam",
+            },
+        }
+        edam = {
+            "files": files,
+            "name": "uart_loop",
+            "parameters": parameters,
+            "toplevel": "uart_top",
+            "tool_options": tool_options,
+        }
+        backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=False)
+        with open(proj_path / "build.log", "w", buffering=1) as log:
+            backend.stdout = log
+            backend.stderr = log
+            backend.configure()
+            # https://github.com/olofk/edalize/issues/423
+            if tool == "vivado":
+                (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
+            backend.build()
+        print(
+            f"Completed baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}"
+        )
+        return backend
+
     futures = {}
     throughputs = dict()
     with PoolExecutor(max_workers=args.jobs) as executor:
@@ -194,11 +190,6 @@ def main():
             futures[rate] = executor.submit(
                 build_eda,
                 rate,
-                target_config,
-                tool,
-                tool_options,
-                files,
-                proj_path_parent,
             )
 
         for rate in RATES:
