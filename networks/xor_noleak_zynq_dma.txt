@@ -1,7 +1,7 @@
 {
   "Associated_Data": {
     "other": {
-      "proc_name": "risp"
+      "proc_name": "zynq_dma"
     },
     "proc_params": {
       "discrete": true,
