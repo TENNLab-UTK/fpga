@@ -216,7 +216,7 @@ def main():
             print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
             if tool == "quartus":
                 print("Verifying JTAG chain is available.")
-                # HACK: Intel's jtagd is like a really old ICE engine.
+                # HACK: Intel's jtagd is like a really old combustion engine.
                 # It has to be beaten with a wrench a few times to get started
                 success = False
                 tries = 0
