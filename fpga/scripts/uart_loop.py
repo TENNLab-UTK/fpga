@@ -148,7 +148,7 @@ def main():
         proj_path = proj_path_parent / f"{rate :07d}"
         proj_path.mkdir(parents=True, exist_ok=True)
         print(
-            f"Compiling baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}"
+            f"Compiling baudrate: {rate : >7} \tLog: {proj_path.absolute() / 'build.log'}"
         )
         parameters = {
             "CLK_FREQ": {
@@ -179,7 +179,7 @@ def main():
                 (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
             backend.build()
         print(
-            f"Completed baudrate: {rate : >7} Log: {proj_path.absolute() / 'build.log'}"
+            f"Completed baudrate: {rate : >7} \tLog: {proj_path.absolute() / 'build.log'}"
         )
         return backend
 
@@ -206,7 +206,7 @@ def main():
             print("UART LOOPBACK START".center(os.get_terminal_size().columns, "-"))
             # 10 bauds per byte
             bps_max = int(rate * 8 / 10)
-            print(f"Baud rate: \t{rate : >7} \tMax bit rate: \t{bps_max:,d} bps")
+            print(f"Baud rate: {rate : >7} \tMax bit rate: {bps_max:,d} bps")
             passing = True
             with Serial(str(args.dev), rate) as serial:
                 serial.flush()
@@ -227,12 +227,12 @@ def main():
                     bps = int(8 * len(tx) / pbar.format_dict["elapsed"])
 
             print(
-                f"Result: \t{'PASS' if passing else 'FAIL'}"
-                + (f" \t\tNet bit rate: \t{bps:,d} bps" if passing else "")
+                f"Result: {'PASS' if passing else 'FAIL'}"
+                + (f" \t\tNet bit rate: {bps:,d} bps" if passing else "")
             )
             if passing:
                 throughputs[rate] = bps / bps_max
-                print(f"\t\t\t\tThroughput: \t{100 * throughputs[rate]:.1f}%")
+                print(f"\t\t\tThroughput: \t{100 * throughputs[rate]:.1f}%")
 
             print("UART LOOPBACK END".center(os.get_terminal_size().columns, "-"))
             print(
@@ -246,11 +246,10 @@ def main():
                 )
 
     pass_rates = sorted(throughputs.keys())
-    print("")
-    print("REPORT".center(65, "="))
+    report_str = ""
     for rate in RATES:
-        print(
-            f"Baud rate: \t{rate : >7}"
+        report_str += (
+            f"Baud rate: {rate : >7}"
             f" \tResult: {'PASS' if rate in pass_rates else 'FAIL'}"
             + (
                 f" \tThroughput: {100 * throughputs.get(rate):.1f}%"
@@ -258,7 +257,13 @@ def main():
                 else ""
             )
         )
-    print("".center(65, "="))
+    report_str = report_str.expandtabs()
+    report_width = max([len(ln) for ln in report_str.split("\n")])
+
+    print("")
+    print("REPORT".center(report_width, "=").center(os.get_terminal_size().columns))
+    print(report_str.center(os.get_terminal_size().columns))
+    print("".center(report_width, "=").center(os.get_terminal_size().columns))
 
     with open(config_fname, "r") as f:
         config = load(f)
