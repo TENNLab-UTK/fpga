@@ -68,7 +68,7 @@ def gen_zynq_dma_net(net: neuro.Network, zynq_dma_net_path: str = "", inp_width_
                 zynq_dma_net_json["Associated_Data"]["proc_params"]["zynq_dma"]["out_pkt_structure"].append(node.id)
     
         if "other" in zynq_dma_net_json["Associated_Data"]:
-            zynq_dma_net_json["Associated_Data"]["other"] = "zynq_dma"
+            zynq_dma_net_json["Associated_Data"]["other"]["proc_name"] = "zynq_dma"
 
         zynq_dma_net_json_str = json.dumps(zynq_dma_net_json, indent=2)
         with open(zynq_dma_net_path, 'w') as file:
