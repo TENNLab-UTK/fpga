@@ -145,10 +145,10 @@ def main():
         )
 
     def build_eda(rate: int):
-        proj_path = proj_path_parent / f"{rate :07d}"
+        proj_path = proj_path_parent / f"{rate:07d}"
         proj_path.mkdir(parents=True, exist_ok=True)
         print(
-            f"Compiling baudrate: {rate : >7} \tLog: {proj_path.absolute() / 'build.log'}"
+            f"Compiling baudrate: {rate:7d} \tLog: {proj_path.absolute() / 'build.log'}"
         )
         parameters = {
             "CLK_FREQ": {
@@ -179,12 +179,13 @@ def main():
                 (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
             backend.build()
         print(
-            f"Completed baudrate: {rate : >7} \tLog: {proj_path.absolute() / 'build.log'}"
+            f"Completed baudrate: {rate:7d} \tLog: {proj_path.absolute() / 'build.log'}"
         )
         return backend
 
     futures = {}
     throughputs = dict()
+    interframe_gaps = dict()
     with PoolExecutor(max_workers=args.jobs) as executor:
         for rate in RATES:
             futures[rate] = executor.submit(
@@ -206,7 +207,7 @@ def main():
             print("UART LOOPBACK START".center(os.get_terminal_size().columns, "-"))
             # 10 bauds per byte
             bps_max = int(rate * 8 / 10)
-            print(f"Baud rate: {rate : >7} \tMax bit rate: {bps_max:,d} bps")
+            print(f"Baud rate: {rate:7d} \tMax bit rate: {bps_max:,d} bps")
             passing = True
             with Serial(str(args.dev), rate) as serial:
                 serial.flush()
@@ -226,13 +227,19 @@ def main():
                         pbar.update(8 * args.chunk_size)
                     bps = int(8 * len(tx) / pbar.format_dict["elapsed"])
 
-            print(
-                f"Result: {'PASS' if passing else 'FAIL'}"
-                + (f" \t\tNet bit rate: {bps:,d} bps" if passing else "")
-            )
             if passing:
                 throughputs[rate] = bps / bps_max
-                print(f"\t\t\tThroughput: \t{100 * throughputs[rate]:.1f}%")
+                interframe_gaps[rate] = 0.8 / bps - 1.0 / rate
+            print(
+                f"Result: {'PASS' if passing else 'FAIL'}"
+                + (
+                    f" \t\tNet bit rate: {bps:,d} bps"
+                    f" \t\tThroughput: {100 * throughputs[rate]:4.1f}%"
+                    f" \t\tInterframe gap (IFG): {int(1e9 * interframe_gaps[rate]):3d} ns"
+                    if passing
+                    else ""
+                )
+            )
 
             print("UART LOOPBACK END".center(os.get_terminal_size().columns, "-"))
             print(
@@ -247,23 +254,28 @@ def main():
 
     pass_rates = sorted(throughputs.keys())
     report_str = ""
+    report_width = 0
     for rate in RATES:
-        report_str += (
-            f"Baud rate: {rate : >7}"
+        report_ln = (
+            f"Baud rate: {rate:7d}"
             f" \tResult: {'PASS' if rate in pass_rates else 'FAIL'}"
             + (
-                f" \tThroughput: {100 * throughputs.get(rate):.1f}%"
+                f" \tThroughput: {100 * throughputs.get(rate):4.1f}%"
+                f" \tIFG: {int(1e9 * interframe_gaps.get(rate)):3d} ns"
                 if rate in pass_rates
                 else ""
             )
-            + "\n"
-        )
-    report_str = report_str.expandtabs()
-    report_width = max([len(ln) for ln in report_str.split("\n")])
+        ).expandtabs()
+        if rate == RATES[0]:
+            # program would have exited if the first rate had failed
+            report_width = len(report_ln)
+        report_ln += " " * (report_width - len(report_ln))
+        report_str += report_ln.center(os.get_terminal_size().columns) + "\n"
 
     print("")
     print("REPORT".center(report_width, "=").center(os.get_terminal_size().columns))
-    print(report_str.center(os.get_terminal_size().columns))
+    # don't print final newline
+    print(report_str[:-1])
     print("".center(report_width, "=").center(os.get_terminal_size().columns))
 
     with open(config_fname, "r") as f:
