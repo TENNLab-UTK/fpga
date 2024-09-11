@@ -256,6 +256,7 @@ def main():
                 if rate in pass_rates
                 else ""
             )
+            + "\n"
         )
     report_str = report_str.expandtabs()
     report_width = max([len(ln) for ln in report_str.split("\n")])
