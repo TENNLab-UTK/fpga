@@ -18,6 +18,7 @@ package processor_config;
 endpackage
 
 import processor_config::*;
+import network_config::*;
 
 module axis_processor (
     input logic clk,
@@ -25,7 +26,8 @@ module axis_processor (
     axis.s s_axis,
     axis.m m_axis
 );
-    logic net_valid, net_ready, net_out;
+    logic net_valid, net_ready;
+    logic [NET_NUM_OUT-1:0] net_out;
 
     network_source #(
         .RUN_WIDTH(RUN_WIDTH)
