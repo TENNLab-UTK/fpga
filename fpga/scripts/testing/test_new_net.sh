@@ -11,7 +11,7 @@ fpgautil -b /home/petalinux/network.bit.bin
 insmod $dma_module_path
 
 cd /home/petalinux/zynq_framework/cpp-apps
-bin/processor_tool_zynq_dma < /home/petalinux/proc_tool_commands.txt > /home/petalinux/proc_tool_output_fires_fpga.txt
+time bin/processor_tool_zynq_dma < /home/petalinux/proc_tool_commands.txt > /home/petalinux/proc_tool_output_fires_fpga.txt
 
 cd /home/petalinux
 diff -s proc_tool_output_fires_sim.txt proc_tool_output_fires_fpga.txt
