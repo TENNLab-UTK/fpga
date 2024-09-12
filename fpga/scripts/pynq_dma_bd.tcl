@@ -816,16 +816,29 @@ proc create_root_design { parentCell inp_pkt_width_bits out_pkt_width_bits } {
     set out_pkt_width_bits 16
   }
 
+  if { $inp_pkt_width_bits > 32 } {
+   set m_axi_mm2s_data_width $inp_pkt_width_bits
+  } else {
+   set m_axi_mm2s_data_width 32
+  }
+
+  if { $out_pkt_width_bits > 32 } {
+   set m_axi_s2mm_data_width $out_pkt_width_bits
+  } else {
+   set m_axi_s2mm_data_width 32
+  }
+
   # Create instance: axi_dma_0, and set properties
   set axi_dma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_0 ]
   set_property -dict [list \
     CONFIG.c_addr_width {64} \
     CONFIG.c_include_sg {1} \
     CONFIG.c_sg_include_stscntrl_strm {0} \
-    CONFIG.c_m_axi_s2mm_data_width {32} \
+    CONFIG.c_m_axi_mm2s_data_width $m_axi_mm2s_data_width \
     CONFIG.c_m_axis_mm2s_tdata_width $inp_pkt_width_bits \
     CONFIG.c_mm2s_burst_size {32} \
     CONFIG.c_s2mm_burst_size {32} \
+    CONFIG.c_m_axi_s2mm_data_width $m_axi_s2mm_data_width \
     CONFIG.c_s_axis_s2mm_tdata_width $out_pkt_width_bits \
     CONFIG.c_sg_length_width {26} \
   ] $axi_dma_0
