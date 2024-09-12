@@ -22,7 +22,7 @@ module risp_neuron #(
     input logic clk,
     input logic arstn,
     input logic en,
-    input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
+    input logic signed [CHARGE_WIDTH-1:0] inp [0:`max(NUM_INP,1)-1],
     output logic fire
 );
     localparam FUSE_START = THRESHOLD + !THRESHOLD_INCLUSIVE;
