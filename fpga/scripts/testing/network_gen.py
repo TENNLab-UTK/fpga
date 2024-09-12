@@ -13,14 +13,14 @@ MAX_NUM_SYNAPSES = 1000
 
 # Error check network generation arguments
 def error_check_args(num_inputs: int, num_neurons: int, num_outputs: int, num_synapses: int) -> None:
-    # if(num_inputs > num_neurons):
-    #     raise ValueError("ERROR: Number of input neurons cannot exceed total number of neurons")
+    if(num_inputs > num_neurons):
+        raise ValueError("ERROR: Number of input neurons cannot exceed total number of neurons")
     
-    # if(num_outputs > num_neurons):
-    #     raise ValueError("ERROR: Number of output neurons cannot exceed total number of neurons")
+    if(num_outputs > num_neurons):
+        raise ValueError("ERROR: Number of output neurons cannot exceed total number of neurons")
 
-    if(num_inputs + num_outputs > num_neurons):
-        raise ValueError("ERROR: Number of input + output neurons cannot exceed total number of neurons")
+    # if(num_inputs + num_outputs > num_neurons):
+    #     raise ValueError("ERROR: Number of input + output neurons cannot exceed total number of neurons")
     
     if(num_synapses > num_neurons * (num_neurons - 1)):
         raise ValueError("ERROR: Too many synapses for random network generation (max number is num_neurons(num_neurons-1))")
@@ -28,6 +28,10 @@ def error_check_args(num_inputs: int, num_neurons: int, num_outputs: int, num_sy
 
 # Generate a network randomly and write it to a file after arguments have already been error checked
 def make_network(template_net_json_path: str, framework_path: str, num_neurons: int, num_synapses: int, seed: int, num_inputs: int, num_outputs: int, output_net_json_path: str) -> None:
+
+    # Seed random number generator
+    np.random.seed(seed)
+    random.seed(seed)
 
     # Error check path to the template network JSON file
     template_net_path = template_net_json_path
@@ -77,8 +81,7 @@ def make_network(template_net_json_path: str, framework_path: str, num_neurons: 
         networktool.stdin.flush()
 
     # Identify randomized output nodes using AO command
-    avail_output_neuron_ids = np.setxor1d(neuron_ids, input_neuron_ids)
-    output_neuron_ids = np.random.choice(avail_output_neuron_ids, num_outputs, replace=False)
+    output_neuron_ids = np.random.choice(neuron_ids, num_outputs, replace=False)
     for output_neuron_id in output_neuron_ids:
         networktool.stdin.write(f'AO {output_neuron_id}\n'.encode())
         networktool.stdin.flush()
@@ -139,9 +142,5 @@ if __name__ == '__main__':
     parser.add_argument("--framework_path", "-f", type=str, required=True, help="Path to the TENNLab framework directory")
     parser.add_argument("--seed", "-s", type=int, default=0, help="Seed for random number generation")
     args = parser.parse_args()
-
-    # Seed random number generator
-    np.random.seed(args.seed)
-    random.seed(args.seed)
 
     generate_network(args.template_net_json_path, args.framework_path, args.num_neurons, args.num_synapses, args.seed, args.num_inputs, args.num_outputs, args.output_net_json_path)
