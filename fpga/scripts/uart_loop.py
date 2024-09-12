@@ -61,13 +61,6 @@ def main():
         help="Number of bytes to test at each baud rate (defaults to 1MiB)",
     )
     parser.add_argument(
-        "-c",
-        dest="chunk_size",
-        type=int,
-        default=4096,
-        help="Number of bytes per chunk to send over UART (defaults to 4KiB)",
-    )
-    parser.add_argument(
         "-s",
         dest="seed",
         type=int,
@@ -144,6 +137,11 @@ def main():
             ]
         )
 
+    chunk_size = min(
+        target_config["parameters"]["uart"]["buffer_rx"],
+        target_config["parameters"]["uart"]["buffer_tx"],
+    )
+
     def build_eda(rate: int):
         proj_path = proj_path_parent / f"{rate:07d}"
         proj_path.mkdir(parents=True, exist_ok=True)
@@ -216,15 +214,15 @@ def main():
                 tx = random.randbytes(args.num_bytes)
 
                 with tqdm(total=(8 * len(tx)), unit="bit", unit_scale=True) as pbar:
-                    for chunk in range(0, len(tx), args.chunk_size):
-                        serial.write(tx[chunk : chunk + args.chunk_size])
+                    for chunk in range(0, len(tx), chunk_size):
+                        serial.write(tx[chunk : chunk + chunk_size])
                         serial.flush()
                         # 20 = 10 bauds per byte times 2 directions
-                        rx = serial.read(args.chunk_size, 20 * args.chunk_size / rate)
-                        if tx[chunk : chunk + args.chunk_size] != rx:
+                        rx = serial.read(chunk_size, 20 * chunk_size / rate)
+                        if tx[chunk : chunk + chunk_size] != rx:
                             passing = False
                             break
-                        pbar.update(8 * args.chunk_size)
+                        pbar.update(8 * chunk_size)
                     bps = int(8 * len(tx) / pbar.format_dict["elapsed"])
 
             if passing:

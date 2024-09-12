@@ -437,6 +437,17 @@ class Processor(neuro.Processor):
         backend.run()
 
     def _set_schema(self):
+        match self._out_type:
+            case IoType.DISPATCH:
+                out_names = [None]
+                out_fmt_str = f"u{unsigned_width(self._network.num_outputs())}"
+            case IoType.STREAM:
+                out_names = list(range(self._network.num_outputs()))
+                out_fmt_str = "".join("b1" for _ in range(self._network.num_outputs()))
+            case _:
+                raise ValueError()
+        self._out_fmt = bs.compile(out_fmt_str, out_names)
+
         net_charge_width = charge_width(self._network)
         opc_width = opcode_width(self._Opcode)
 
@@ -453,7 +464,17 @@ class Processor(neuro.Processor):
                 cmd_names = spk_names + ["operand"]
                 cmd_fmt_str = spk_fmt_str + f"u{operand_width}"
                 self._cmd_fmt = bs.compile(cmd_fmt_str, cmd_names)
-                self._max_run = 2 ** (operand_width) - 1
+                max_bytes_per_run = self._out_fmt.calcsize() * (
+                    self._network.num_outputs() + 1
+                    if self._out_type == IoType.DISPATCH
+                    else 1
+                )
+                # limited by both buffer size and command field width
+                self._max_run = min(
+                    2 ** (operand_width) - 1,
+                    self._target_config["parameters"]["uart"]["buffer_tx"]
+                    // max_bytes_per_run,
+                )
 
                 if idx_width > 0:
                     spk_names.append("inp_idx")
@@ -468,14 +489,3 @@ class Processor(neuro.Processor):
             case _:
                 raise ValueError()
         self._spk_fmt = bs.compile(spk_fmt_str, spk_names)
-
-        match self._out_type:
-            case IoType.DISPATCH:
-                out_names = [None]
-                out_fmt_str = f"u{unsigned_width(self._network.num_outputs())}"
-            case IoType.STREAM:
-                out_names = list(range(self._network.num_outputs()))
-                out_fmt_str = "".join("b1" for _ in range(self._network.num_outputs()))
-            case _:
-                raise ValueError()
-        self._out_fmt = bs.compile(out_fmt_str, out_names)
