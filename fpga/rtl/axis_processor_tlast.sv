@@ -18,6 +18,8 @@ package processor_tlast_config;
     localparam int OUT_TDATA_WIDTH_BYTES = `width_nearest_pow2_bytes(SNK_WIDTH+1);
 endpackage
 
+import processor_tlast_config::*;
+
 module axis_processor_tlast (
     input logic clk,
     input logic arstn,
@@ -32,7 +34,7 @@ module axis_processor_tlast (
     // Connect AXIS slave signals to inner axis_processor
     assign s_axis_proc.tvalid = s_axis.tvalid;
     assign s_axis.tready = s_axis_proc.tready;
-    assign s_axis_proc.tdata = s_axis.tdata;
+    assign s_axis_proc.tdata = s_axis.tdata[(INP_TDATA_WIDTH_BYTES*8)-1 -: INP_WIDTH];
     assign s_axis_proc.tstrb = s_axis.tstrb;
     assign s_axis_proc.tkeep = s_axis.tkeep;
     assign s_axis_proc.tlast = s_axis.tlast;
