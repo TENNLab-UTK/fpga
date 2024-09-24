@@ -11,6 +11,7 @@ from heapq import heapify, heappop, heappush, merge
 from importlib import resources
 from json import load
 from math import inf
+from time import sleep
 from typing import Iterable
 
 import bitstruct as bs
@@ -151,7 +152,7 @@ class Processor(neuro.Processor):
             while self._inp_queue and self._inp_queue[0].time == self._hw_time:
                 # send these spikes as soon as they arrive to reduce latency
                 spikes_now.append(self._inp_queue.popleft())
-            self._hw_tr(spikes_now, runs=0)
+            self._hw_tx(spikes_now, runs=0)
 
     def clear(self) -> None:
         self.clear_activity()
@@ -179,6 +180,7 @@ class Processor(neuro.Processor):
         self.clear()
         self._network = net
         self._set_schema()
+        self._set_comm_limits()
         self._program_target()
         self.clear_activity()
 
@@ -242,7 +244,7 @@ class Processor(neuro.Processor):
             rx = self._interface.read(
                 num_rx_bytes,
                 100_000 * (num_tr_bytes) / self._interface.baudrate,
-            )
+            )[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
 
@@ -251,7 +253,7 @@ class Processor(neuro.Processor):
                     for _ in range(self._out_fmt.unpack(rx)[None]):
                         sub_rx = self._interface.read(
                             num_rx_bytes, 10 * num_rx_bytes / self._interface.baudrate
-                        )
+                        )[::-1]
                         if len(sub_rx) != num_rx_bytes:
                             raise RuntimeError(
                                 "Did not receive coherent response from target."
@@ -286,6 +288,14 @@ class Processor(neuro.Processor):
                     )
                     for idx, val in spike_dict.items()
                 ]
+                if runs:
+                    self._interface.write(
+                        self._cmd_fmt.pack(
+                            {"opcode": self._Opcode.RUN, "operand": runs}
+                        )[::-1]
+                    )
+                    self._interface.flush()
+                    sleep(self._secs_per_run * runs)
 
             case IoType.STREAM:
                 if not runs:
@@ -304,6 +314,8 @@ class Processor(neuro.Processor):
 
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
+                    self._interface.flush()
+                    sleep(self._secs_per_run)
         self._hw_time += runs
 
     def _out_since_last_run(self, out_idx) -> list[int]:
@@ -435,12 +447,6 @@ class Processor(neuro.Processor):
             case _:
                 raise ValueError()
         self._out_fmt = bs.compile(out_fmt_str, out_names)
-        max_bytes_per_run = self._out_fmt.calcsize() * (
-            self._network.num_outputs() + 1 if self._out_type == IoType.DISPATCH else 1
-        )
-        self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] // max_bytes_per_run
-        )
 
         net_charge_width = charge_width(self._network)
         opc_width = opcode_width(self._Opcode)
@@ -458,11 +464,6 @@ class Processor(neuro.Processor):
                 cmd_names = spk_names + ["operand"]
                 cmd_fmt_str = spk_fmt_str + f"u{operand_width}"
                 self._cmd_fmt = bs.compile(cmd_fmt_str, cmd_names)
-                # limited by both buffer size and command field width
-                self._max_run = min(
-                    2 ** (operand_width) - 1,
-                    self._max_run,
-                )
 
                 if idx_width > 0:
                     spk_names.append("inp_idx")
@@ -477,3 +478,35 @@ class Processor(neuro.Processor):
             case _:
                 raise ValueError()
         self._spk_fmt = bs.compile(spk_fmt_str, spk_names)
+
+    def _set_comm_limits(self):
+        self._secs_per_run = 0.0
+
+        max_bytes_per_run = self._out_fmt.calcsize()
+        match self._out_type:
+            case IoType.DISPATCH:
+                max_bytes_per_run *= self._network.num_outputs() + 1
+                self._secs_per_run += (
+                    self._network.num_outputs()
+                    / self._target_config["parameters"]["clk_freq"]
+                )
+            case IoType.STREAM:
+                pass
+            case _:
+                raise ValueError()
+        self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
+        self._max_run = (
+            self._target_config["parameters"]["uart"]["buffer_tx"] // max_bytes_per_run
+        )
+
+        match self._inp_type:
+            case IoType.DISPATCH:
+                # limited by both buffer size and command field width
+                self._max_run = min(
+                    2 ** (self._cmd_fmt._infos[1].size) - 1,
+                    self._max_run,
+                )
+            case IoType.STREAM:
+                pass
+            case _:
+                raise ValueError()
