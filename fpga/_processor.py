@@ -294,7 +294,6 @@ class Processor(neuro.Processor):
                             {"opcode": self._Opcode.RUN, "operand": runs}
                         )[::-1]
                     )
-                    self._interface.flush()
                     sleep(self._secs_per_run * runs)
 
             case IoType.STREAM:
@@ -314,7 +313,6 @@ class Processor(neuro.Processor):
 
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
-                    self._interface.flush()
                     sleep(self._secs_per_run)
         self._hw_time += runs
 
