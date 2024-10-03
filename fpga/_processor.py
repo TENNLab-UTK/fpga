@@ -278,6 +278,15 @@ class Processor(neuro.Processor):
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
 
+        tx_secs = (
+            width_bits_to_bytes(self._spk_fmt.calcsize())
+            * 10
+            / self._interface.baudrate
+        )
+
+        def pause(runs: int) -> None:
+            sleep(max(self._secs_per_run * runs - tx_secs, 0.0))
+
         match self._inp_type:
             case IoType.DISPATCH:
                 [
@@ -294,7 +303,7 @@ class Processor(neuro.Processor):
                             {"opcode": self._Opcode.RUN, "operand": runs}
                         )[::-1]
                     )
-                    sleep(self._secs_per_run * runs)
+                    pause(runs)
 
             case IoType.STREAM:
                 if not runs:
@@ -310,10 +319,11 @@ class Processor(neuro.Processor):
                 if self._hw_time == 0:
                     spike_dict["opcode"] = self._Opcode.CLR
                 self._interface.write(self._spk_fmt.pack(spike_dict)[::-1])
+                pause(1)
 
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
-                    sleep(self._secs_per_run)
+                    pause(1)
         self._hw_time += runs
 
     def _out_since_last_run(self, out_idx) -> list[int]:
@@ -480,7 +490,7 @@ class Processor(neuro.Processor):
     def _set_comm_limits(self):
         self._secs_per_run = 0.0
 
-        max_bytes_per_run = self._out_fmt.calcsize()
+        max_bytes_per_run = width_bits_to_bytes(self._out_fmt.calcsize())
         match self._out_type:
             case IoType.DISPATCH:
                 max_bytes_per_run *= self._network.num_outputs() + 1
