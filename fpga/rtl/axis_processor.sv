@@ -29,8 +29,9 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    logic net_valid, net_ready, net_out, net_arstn;
+    logic net_valid, net_ready, net_arstn;
     logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
+    logic [NET_NUM_OUT-1:0] net_out;
 
     network_source #(
         .RUN_WIDTH(RUN_WIDTH)
