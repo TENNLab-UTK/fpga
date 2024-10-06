@@ -53,7 +53,7 @@ class _InpQueue(list):
         heappush(self, item)
 
     def extend(self, iterable: Iterable[neuro.Spike]) -> None:
-        self.__init__(merge(self, iterable))
+        [self.append(item) for item in iterable]
 
     def popleft(self) -> neuro.Spike:
         return heappop(self)
