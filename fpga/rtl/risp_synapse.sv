@@ -11,7 +11,8 @@
 module risp_synapse #(
     parameter int WEIGHT,
     parameter int DELAY,
-    parameter int CHARGE_WIDTH
+    parameter int CHARGE_WIDTH,
+    parameter bit FIRE_LIKE_RAVENS=0
 ) (
     input logic clk,
     input logic arstn,
@@ -19,15 +20,16 @@ module risp_synapse #(
     input logic inp,
     output logic signed [CHARGE_WIDTH-1:0] out
 );
-    logic fifo [DELAY:0];
+    localparam TRUE_DELAY = DELAY - FIRE_LIKE_RAVENS;
+    logic fifo [TRUE_DELAY:0];
 
     always_comb fifo[0] = inp;
 
-    assign out = fifo[DELAY] ? WEIGHT : 0;
+    assign out = fifo[TRUE_DELAY] ? WEIGHT : 0;
 
     generate
         // starts with 1 so we don't generate a register for 0 delay
-        for (genvar i = 1; i < DELAY + 1; ++i) begin: delay_chain
+        for (genvar i = 1; i < TRUE_DELAY + 1; ++i) begin: delay_chain
             always_ff @(posedge clk or negedge arstn) begin
                 if (arstn == 0) begin
                     fifo[i] <= 0;

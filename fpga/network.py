@@ -8,31 +8,65 @@ import pathlib as pl
 import re
 from hashlib import sha256
 from json import dumps
-from math import ceil, log2, log10
+from math import ceil, log10
+from warnings import warn
 
 import neuro
 
 import fpga
+from fpga._math import signed_width
 
 HASH_LEN = 10
 
 
 def charge_width(net: neuro.Network) -> int:
-    proc_params = net.get_data("proc_params")
-    if not isinstance(proc_params, dict):
-        proc_params = proc_params.to_python()
-        
-    return int(
-        ceil(
-            log2(
-                max(
-                    abs(proc_params["max_weight"] + 1),  # +1 for perfect powers of 2
-                    abs(proc_params["min_weight"]),
-                )
-            )
-        )
-        + 1  # +1 for the sign bit
+    proc_params = proc_params_dict(net)
+    weight_width = max(
+        [
+            signed_width(weight)
+            for weight in [
+                proc_params["min_weight"],
+                proc_params["max_weight"],
+            ]
+        ]
     )
+
+    scaling_width = signed_width(spike_value_factor(net))
+    if scaling_width > weight_width:
+        warn(
+            f"A spike factor of {spike_value_factor(net)}"
+            f" will mandate a network charge width of {scaling_width} bits"
+            f" which is greater than the charge width of {weight_width} bits"
+            " mandated by the weight range"
+            f" [{proc_params['min_weight']}, {proc_params['max_weight']}]."
+            " This will potentially waste hardware resources."
+        )
+
+    return max(weight_width, scaling_width)
+
+
+def spike_value_factor(net: neuro.Network) -> float:
+    proc_params = proc_params_dict(net)
+    svf = float(proc_params["max_weight"])
+    if "spike_value_factor" in proc_params:
+        svf = proc_params["spike_value_factor"]
+    if svf < 1.0:
+        raise ValueError("Spike value factor must be greater than or equal to 1")
+    return svf
+
+
+def proc_params_dict(net: neuro.Network) -> dict:
+    proc_params = net.get_data("proc_params")
+    if type(proc_params) is not dict:
+        proc_params = proc_params.to_python()
+    return proc_params
+
+
+def proc_name(net: neuro.Network) -> str:
+    other_data = net.get_data("other")
+    if type(other_data) is not dict:
+        other_data = other_data.to_python()
+    return other_data["proc_name"]
 
 
 def _num_inp_ports(node: neuro.Node) -> int:
@@ -40,10 +74,7 @@ def _num_inp_ports(node: neuro.Node) -> int:
 
 
 def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
-    proc_params = net.get_data("proc_params")
-    if not isinstance(proc_params, dict):
-        proc_params = proc_params.to_python()
-
+    proc_params = proc_params_dict(net)
     net_charge_width = charge_width(net)
     if not proc_params["discrete"]:
         # TODO: imlement conversion from non-discrete net
@@ -57,8 +88,9 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
 
-    if "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]:
-        raise NotImplementedError("RAVENS firing pattern is not yet supported.")
+    fire_like_ravens = (
+        "fire_like_ravens" in proc_params and proc_params["fire_like_ravens"]
+    )
 
     f.write(f"package network{suffix}_config;\n")
     f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
@@ -93,15 +125,17 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         if ("threshold_inclusive" in proc_params)
         else True
     )
+
+    min_potential = -1 * proc_params["max_threshold"]
     if "min_potential" in proc_params:
-        if proc_params["min_potential"] <= 0:
-            min_potential = proc_params["min_potential"]
-        else:
-            raise ValueError("min_potential must be less than or equal to 0")
+        min_potential = proc_params["min_potential"]
     elif ("non_negative_charge" in proc_params) and proc_params["non_negative_charge"]:
+        warn(
+            "non_negative_charge is a deprecated field; set min_potential to 0 instead."
+        )
         min_potential = 0
-    else:
-        min_potential = -1 * proc_params["max_threshold"]
+    if min_potential > 0:
+        raise ValueError("min_potential must be less than or equal to 0")
 
     leak_mode = proc_params["leak_mode"] if ("leak_mode" in proc_params) else "none"
     match (leak_mode):
@@ -136,6 +170,12 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f" neur_{neur_id(node.id)}_inp [0:{max(num_inp_ports,1) - 1}];\n"
         )
         if node.input_id > -1:
+            if (thresh(node) + int(not thresh_incl)) > spike_value_factor(net):
+                warn(
+                    f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
+                    f" of {thresh(node)} which cannot be solely triggered by an"
+                    f" input scaling value of {spike_value_factor(net)}."
+                )
             # use the last indexed port for input to make synapse generation easier
             f.write(
                 f"    assign neur_{node.id:0{neur_id_digits}d}"
@@ -157,7 +197,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
         f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
         f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
-        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)})\n")
+        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
+        f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
@@ -195,7 +236,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f.write(f"    risp_synapse #(\n")
             f.write(f"        .WEIGHT({weight(inp)}),\n")
             f.write(f"        .DELAY({delay(inp)}),\n")
-            f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH)\n")
+            f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
+            f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
             f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
             f.write(f"        .clk,\n")
             f.write(f"        .arstn,\n")
@@ -213,10 +255,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 def write_network_sv(sv, net: neuro.Network, suffix: str = "") -> None:
     net_other = net.get_data("other")
 
-    if not isinstance(net_other, dict):
-        net_other = net_other.to_python()
-
-    proc = net_other["proc_name"]
+    proc = proc_name(net)
 
     sv.write(
         "// This file has been generated by the Network HDL Generator.\n"
@@ -233,7 +272,9 @@ def write_network_sv(sv, net: neuro.Network, suffix: str = "") -> None:
 
 
 def hash_network(net: neuro.Network, length: int = None) -> str:
-    net_dict = net.as_json().to_python()
+    net_dict = net.as_json()
+    if type(net_dict) is not dict:
+        net_dict = net_dict.to_python()
     # Remove fields with no bearing on arch
     # TODO: filter more fields?
     for node in net_dict["Nodes"]:

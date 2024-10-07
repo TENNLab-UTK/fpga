@@ -8,6 +8,8 @@ import argparse
 import os
 import pathlib as pl
 import random
+import sys
+from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 from importlib import resources
 from json import dump, load
 
@@ -45,18 +47,18 @@ def main():
         "dev", type=pl.Path, help="cdev path for UART (e.g. '/dev/ttyS1')"
     )
     parser.add_argument(
+        "-j",
+        dest="jobs",
+        type=int,
+        default=4,
+        help="Number of parallel jobs to run (defaults to 4)",
+    )
+    parser.add_argument(
         "-n",
         dest="num_bytes",
         type=int,
         default=1048576,
         help="Number of bytes to test at each baud rate (defaults to 1MiB)",
-    )
-    parser.add_argument(
-        "-c",
-        dest="chunk_size",
-        type=int,
-        default=4096,
-        help="Number of bytes per chunk to send over UART (defaults to 4KiB)",
     )
     parser.add_argument(
         "-s",
@@ -73,18 +75,18 @@ def main():
     with open(config_fname) as f:
         target_config = load(f)[args.target]
 
-    proj_path = fpga.eda_build_path / args.target / "uart_loop"
+    proj_path_parent = fpga.eda_build_path / args.target / "uart" / "loop"
 
-    rtl_path = pl.Path(
+    rtl_path = ".." / pl.Path(
         os.path.relpath(
             (pl.Path(resources.files(fpga.rtl))).resolve(),
-            start=proj_path.resolve(),
+            start=proj_path_parent.resolve(),
         )
     )
-    config_path = pl.Path(
+    config_path = ".." / pl.Path(
         os.path.relpath(
             (pl.Path(resources.files(fpga.config))).resolve(),
-            start=proj_path.resolve(),
+            start=proj_path_parent.resolve(),
         )
     )
 
@@ -92,25 +94,33 @@ def main():
     files.extend(
         [
             {
+                "name": str(rtl_path / f"{module}.v"),
+                "file_type": "verilogSource",
+            }
+            for module in [
+                "axis_adapter",
+                "axis_uart",
+            ]
+        ]
+    )
+    files.extend(
+        [
+            {
                 "name": str(rtl_path / f"{module}.sv"),
                 "file_type": "systemVerilogSource",
             }
             for module in [
-                "axis_adapter",
-                "axis_if",
-                "axis_uart",
-                "uart_loopback",
+                "axis_loop_proc",
+                "uart_processor",
             ]
         ]
     )
 
     tool_options = target_config["tools"]
     tool = target_config["default_tool"]
-
-    proj_path.mkdir(parents=True, exist_ok=True)
+    tool_options[tool]["include_dirs"] = [str(rtl_path)]
 
     if tool == "vivado":
-        tool_options["vivado"]["include_dirs"] = [str(rtl_path)]
         tool_options["vivado"]["source_mgmt_mode"] = "All"
         files.extend(
             [
@@ -127,10 +137,17 @@ def main():
             ]
         )
 
-    throughputs = dict()
-    for rate in RATES:
-        print(f"TESTING BAUD RATE {rate}".center(os.get_terminal_size().columns, "="))
-        print("FPGA BUILD START".center(os.get_terminal_size().columns, "-"))
+    chunk_size = min(
+        target_config["parameters"]["uart"]["buffer_rx"],
+        target_config["parameters"]["uart"]["buffer_tx"],
+    )
+
+    def build_eda(rate: int):
+        proj_path = proj_path_parent / f"{rate:07d}"
+        proj_path.mkdir(parents=True, exist_ok=True)
+        print(
+            f"Compiling baudrate: {rate:7d} \tLog: {proj_path.absolute() / 'build.log'}"
+        )
         parameters = {
             "CLK_FREQ": {
                 "datatype": "str",
@@ -143,81 +160,121 @@ def main():
                 "paramtype": "vlogparam",
             },
         }
-
         edam = {
             "files": files,
-            "name": f"uart_loop_{args.target}",
+            "name": "uart_loop",
             "parameters": parameters,
             "toplevel": "uart_top",
             "tool_options": tool_options,
         }
         backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=False)
-        print(not (backend.verbose or backend.stdout or backend.stderr))
-        print(f"Configuring {tool} project...")
-        backend.configure()
-        print(f"{edam['toplevel']} project configured.")
-        # changing parameter should be enough to re-run synthesis, but bug exists in edalize
-        # https://github.com/olofk/edalize/issues/423
-        (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
-
-        print(f"Building {edam['toplevel']}...")
-        backend.build()
-        print(f"{edam['toplevel']} built.")
-
-        print(f"Programming {args.target}...")
-        backend.run()
-        print(f"{args.target} programmed with {edam['toplevel']} bitstream.")
-        print("FPGA BUILD END".center(os.get_terminal_size().columns, "-"))
-
-        print("UART LOOPBACK START".center(os.get_terminal_size().columns, "-"))
-        # 10 bauds per byte
-        bps_max = int(rate * 8 / 10)
-        print(f"Baud rate: \t{rate : >7} \tMax bit rate: \t{bps_max:,d} bps")
-        passing = True
-        with Serial(str(args.dev), rate) as serial:
-            serial.flush()
-            while serial.input_waiting() > 0:
-                serial.read(serial.input_waiting(), 1)
-            tx = random.randbytes(args.num_bytes)
-
-            with tqdm(total=(8 * len(tx)), unit="bit", unit_scale=True) as pbar:
-                for chunk in range(0, len(tx), args.chunk_size):
-                    serial.write(tx[chunk : chunk + args.chunk_size])
-                    serial.flush()
-                    # 20 = 10 bauds per byte times 2 directions
-                    rx = serial.read(args.chunk_size, 20 * args.chunk_size / rate)
-                    if tx[chunk : chunk + args.chunk_size] != rx:
-                        passing = False
-                        break
-                    pbar.update(8 * args.chunk_size)
-                bps = int(8 * len(tx) / pbar.format_dict["elapsed"])
-
+        with open(proj_path / "build.log", "w", buffering=1) as log:
+            backend.stdout = log
+            backend.stderr = log
+            backend.configure()
+            # https://github.com/olofk/edalize/issues/423
+            if tool == "vivado":
+                (proj_path / pl.Path(f"{edam['name']}_synth.tcl")).resolve().touch()
+            backend.build()
         print(
-            f"Result: \t{'PASS' if passing else 'FAIL'}"
-            + (f" \t\tNet bit rate: \t{bps:,d} bps" if passing else "")
+            f"Completed baudrate: {rate:7d} \tLog: {proj_path.absolute() / 'build.log'}"
         )
-        if passing:
-            throughputs[rate] = bps / bps_max
-            print(f"\t\t\t\tThroughput: \t{100 * throughputs[rate]:.1f}%")
+        return backend
 
-        print("UART LOOPBACK END".center(os.get_terminal_size().columns, "-"))
-        print(f"TESTED  BAUD RATE {rate}".center(os.get_terminal_size().columns, "="))
-        print("")
+    futures = {}
+    throughputs = dict()
+    interframe_gaps = dict()
+    with PoolExecutor(max_workers=args.jobs) as executor:
+        for rate in RATES:
+            futures[rate] = executor.submit(
+                build_eda,
+                rate,
+            )
+
+        for rate in RATES:
+            backend = futures[rate].result()
+            backend.stdout = sys.stdout
+            backend.stderr = sys.stderr
+            print(
+                f"TESTING BAUD RATE {rate}".center(os.get_terminal_size().columns, "=")
+            )
+            print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
+            backend.run()
+            print("PROGRAMMING END".center(os.get_terminal_size().columns, "-"))
+
+            print("UART LOOPBACK START".center(os.get_terminal_size().columns, "-"))
+            # 10 bauds per byte
+            bps_max = int(rate * 8 / 10)
+            print(f"Baud rate: {rate:7d} \tMax bit rate: {bps_max:,d} bps")
+            passing = True
+            with Serial(str(args.dev), rate) as serial:
+                serial.flush()
+                while serial.input_waiting() > 0:
+                    serial.read(serial.input_waiting(), 1)
+                tx = random.randbytes(args.num_bytes)
+
+                with tqdm(total=(8 * len(tx)), unit="bit", unit_scale=True) as pbar:
+                    for chunk in range(0, len(tx), chunk_size):
+                        serial.write(tx[chunk : chunk + chunk_size])
+                        serial.flush()
+                        # 20 = 10 bauds per byte times 2 directions
+                        rx = serial.read(chunk_size, 20 * chunk_size / rate)
+                        if tx[chunk : chunk + chunk_size] != rx:
+                            passing = False
+                            break
+                        pbar.update(8 * chunk_size)
+                    bps = int(8 * len(tx) / pbar.format_dict["elapsed"])
+
+            if passing:
+                throughputs[rate] = bps / bps_max
+                interframe_gaps[rate] = 0.8 / bps - 1.0 / rate
+            print(
+                f"Result: {'PASS' if passing else 'FAIL'}"
+                + (
+                    f" \t\tNet bit rate: {bps:,d} bps"
+                    f" \t\tThroughput: {100 * throughputs[rate]:4.1f}%"
+                    f" \t\tInterframe gap (IFG): {int(1e9 * interframe_gaps[rate]):3d} ns"
+                    if passing
+                    else ""
+                )
+            )
+
+            print("UART LOOPBACK END".center(os.get_terminal_size().columns, "-"))
+            print(
+                f"TESTED  BAUD RATE {rate}".center(os.get_terminal_size().columns, "=")
+            )
+            print("")
+            if (rate == RATES[0]) and not passing:
+                raise RuntimeError(
+                    f"TEST FAILED: Failure at standard rate of {rate}."
+                    "Higher baud rates will not be tested."
+                )
 
     pass_rates = sorted(throughputs.keys())
-    print("")
-    print("REPORT".center(65, "="))
+    report_str = ""
+    report_width = 0
     for rate in RATES:
-        print(
-            f"Baud rate: \t{rate : >7}"
+        report_ln = (
+            f"Baud rate: {rate:7d}"
             f" \tResult: {'PASS' if rate in pass_rates else 'FAIL'}"
             + (
-                f" \tThroughput: {100 * throughputs.get(rate):.1f}%"
+                f" \tThroughput: {100 * throughputs.get(rate):4.1f}%"
+                f" \tIFG: {int(1e9 * interframe_gaps.get(rate)):3d} ns"
                 if rate in pass_rates
                 else ""
             )
-        )
-    print("".center(65, "="))
+        ).expandtabs()
+        if rate == RATES[0]:
+            # program would have exited if the first rate had failed
+            report_width = len(report_ln)
+        report_ln += " " * (report_width - len(report_ln))
+        report_str += report_ln.center(os.get_terminal_size().columns) + "\n"
+
+    print("")
+    print("REPORT".center(report_width, "=").center(os.get_terminal_size().columns))
+    # don't print final newline
+    print(report_str[:-1])
+    print("".center(report_width, "=").center(os.get_terminal_size().columns))
 
     with open(config_fname, "r") as f:
         config = load(f)

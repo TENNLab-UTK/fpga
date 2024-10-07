@@ -17,7 +17,7 @@ module risp_neuron #(
     parameter int CHARGE_WIDTH,
     parameter int POTENTIAL_MIN,
     parameter bit THRESHOLD_INCLUSIVE=1,
-    parameter bit FIRE_LIKE_RAVENS=0    // TODO Implement
+    parameter bit FIRE_LIKE_RAVENS=0
 ) (
     input logic clk,
     input logic arstn,
@@ -35,22 +35,37 @@ module risp_neuron #(
     logic [FUSE_WIDTH-1:0] fuse;
     logic signed [SUM_WIDTH-1:0] sum;
 
-    always_comb begin: calc_fire
+    logic do_fire;
+
+    always_comb begin: calc_do_fire
         // determine if neuron fires this cycle
         sum = LEAK ? FUSE_START : fuse;
         foreach(inp[i]) sum -= inp[i];
-        fire = sum <= 0;
+        do_fire = sum <= 0;
     end
 
     always_ff @(posedge clk or negedge arstn) begin: set_fuse
         if (arstn == 0) begin
             fuse <= FUSE_START;
         end else if (en) begin
-            if (fire) begin
+            if (do_fire) begin
                 fuse <= FUSE_START;
             end else begin
                 fuse <= `min(sum, FUSE_MAX);
             end
         end
     end
+
+    if (FIRE_LIKE_RAVENS) begin
+        always_ff @(posedge clk or negedge arstn) begin: set_fire
+            if (arstn == 0) begin
+                fire <= 0;
+            end else if (en) begin
+                fire <= do_fire;
+            end
+        end
+    end else begin
+        assign fire = do_fire;
+    end
+
 endmodule

@@ -5,9 +5,10 @@
     "max_delay": 7,
     "max_threshold": 127,
     "max_weight": 127,
+    "min_potential": -127,
     "min_threshold": -127,
     "min_weight": -127,
-    "non_negative_charge": false,
     "run_time_inclusive": false,
+    "spike_value_factor": 127,
     "threshold_inclusive": true
 }
