@@ -192,20 +192,20 @@ class Processor(neuro.Processor):
             self.output_count(out_idx) for out_idx in range(self._network.num_outputs())
         ]
 
-    def output_last_fire(self, out_idx: int) -> int:
+    def output_last_fire(self, out_idx: int) -> float:
         outs = self._out_since_last_run(out_idx)
         return outs[-1] if outs else -1
 
-    def output_last_fires(self) -> list[int]:
+    def output_last_fires(self) -> list[float]:
         return [
             self.output_last_fire(out_idx)
             for out_idx in range(self._network.num_outputs())
         ]
 
-    def output_vector(self, out_idx: int) -> list[int]:
+    def output_vector(self, out_idx: int) -> list[float]:
         return self._out_queue[out_idx]
 
-    def output_vectors(self) -> list[list[int]]:
+    def output_vectors(self) -> list[list[float]]:
         return [
             self._out_queue[out_idx] for out_idx in range(self._network.num_outputs())
         ]
@@ -259,13 +259,13 @@ class Processor(neuro.Processor):
                                 "Did not receive coherent response from target."
                             )
                         self._out_queue[self._out_fmt.unpack(sub_rx)[None]].append(
-                            self._rx_time
+                            float(self._rx_time)
                         )
 
                 case IoType.STREAM:
                     for out_idx, fire in self._out_fmt.unpack(rx).items():
                         if fire:
-                            self._out_queue[out_idx].append(self._rx_time)
+                            self._out_queue[out_idx].append(float(self._rx_time))
             self._rx_time += 1
 
     def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
@@ -326,7 +326,7 @@ class Processor(neuro.Processor):
                     pause(1)
         self._hw_time += runs
 
-    def _out_since_last_run(self, out_idx) -> list[int]:
+    def _out_since_last_run(self, out_idx) -> list[float]:
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
