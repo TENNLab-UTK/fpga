@@ -16,3 +16,5 @@ vivado*
 *.tmp
 *.log
 *.layout
+
+test_*/

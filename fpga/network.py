@@ -133,7 +133,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
         f.write(
             f"    logic signed [NET_CHARGE_WIDTH-1:0]"
-            f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
+            f" neur_{neur_id(node.id)}_inp [0:{max(num_inp_ports,1) - 1}];\n"
         )
         if node.input_id > -1:
             # use the last indexed port for input to make synapse generation easier
@@ -141,6 +141,13 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
                 f"    assign neur_{node.id:0{neur_id_digits}d}"
                 f"_inp[{num_inp_ports - 1}]"
                 f" = inp[{node.input_id}];\n"
+            )
+        
+        if num_inp_ports == 0:
+            f.write(
+                f"    assign neur_{node.id:0{neur_id_digits}d}"
+                f"_inp[0]"
+                f" = 0;\n"
             )
         f.write(f"\n")
 

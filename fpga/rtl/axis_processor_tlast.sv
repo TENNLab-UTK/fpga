@@ -60,7 +60,10 @@ module axis_processor_tlast (
         .m_axis(m_axis_proc)
     );
 
-    axis_packetize axis_packetize_0 (
+    axis_packetize #(
+        .PKT_SIZE(8),
+        .MAX_CLK_CYCLES_PER_PKT(10)
+    ) axis_packetize_0 (
         .clk,
         .arstn,
         .tvalid(m_axis.tvalid),
@@ -72,5 +75,5 @@ module axis_processor_tlast (
     assign m_axis.tvalid = last_cycle | m_axis_proc.tvalid;
     assign m_axis.tdata = {m_axis_proc.tvalid, m_axis_proc.tdata[$bits(m_axis_proc.tdata)-1 -: `min($bits(m_axis.tdata)-1, $bits(m_axis_proc.tdata))], {($bits(m_axis.tdata)-1-`min($bits(m_axis.tdata)-1, $bits(m_axis_proc.tdata))){1'b0}}};
     assign m_axis.tlast = last_cycle | (last_pkt & m_axis.tvalid);
-    assign m_axis.tkeep = 4'b1111;
+    assign m_axis.tkeep = ~0;
 endmodule
