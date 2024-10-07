@@ -35,6 +35,9 @@ module network_sink (
 
     assign net_ready = snk_ready;   // stream source is ready iff sink is ready
     assign snk_valid = net_valid;   // sink is ready iff stream source is valid
-    assign snk = net_out;
+    always_comb begin: calc_snk
+        for (i = 0; i < SNK_WIDTH; i++)
+            snk[SNK_WIDTH - i] = net_out[i];
+    end
 
 endmodule
