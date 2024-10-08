@@ -11,6 +11,7 @@ from heapq import heapify, heappop, heappush, merge
 from importlib import resources
 from json import load
 from math import inf
+from threading import Thread
 from time import sleep
 from typing import Iterable
 
@@ -30,6 +31,8 @@ from fpga.network import (
     proc_name,
     spike_value_factor,
 )
+
+SYSTEM_BUFFER = 4095
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -211,6 +214,9 @@ class Processor(neuro.Processor):
         ]
 
     def run(self, time: int) -> None:
+        rx_thread = Thread(target=self._hw_rx, args=(time,))
+        rx_thread.daemon = True
+        rx_thread.start()
         self._last_run = self._hw_time
         target_time = self._hw_time + time
         while self._hw_time < target_time:
@@ -220,17 +226,18 @@ class Processor(neuro.Processor):
             run_time = int(self._inp_queue[0].time) if self._inp_queue else target_time
             while self._hw_time < run_time:
                 num_runs = min(self._max_run, run_time - self._hw_time)
-                runs_since_rx = self._hw_time - self._rx_time
-                if (num_runs + runs_since_rx) > self._max_run:
-                    self._hw_rx(runs_since_rx)
+                while (self._hw_time + num_runs - self._rx_time) > self._max_run:
+                    sleep(100e-9)
                 self._hw_tx(spikes, runs=num_runs)
                 spikes = []
-        self._hw_rx(self._hw_time - self._rx_time)
+        rx_thread.join()
 
     def _hw_rx(self, runs: int) -> None:
         num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
 
         for _ in range(runs):
+            while self._rx_time == self._hw_time:
+                sleep(100e-9)
             rx = self._interface.read(
                 num_rx_bytes,
                 10.0,
@@ -273,7 +280,8 @@ class Processor(neuro.Processor):
         )
 
         def pause(runs: int) -> None:
-            sleep(max(self._secs_per_run * runs - tx_secs, 0.0))
+            self._hw_time += runs
+            sleep(max(self._secs_per_run * runs, 0.0))
 
         match self._inp_type:
             case IoType.DISPATCH:
@@ -312,7 +320,6 @@ class Processor(neuro.Processor):
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
-        self._hw_time += runs
 
     def _out_since_last_run(self, out_idx) -> list[float]:
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
@@ -492,8 +499,8 @@ class Processor(neuro.Processor):
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
         self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] // max_bytes_per_run
-        )
+            self._target_config["parameters"]["uart"]["buffer_tx"] + SYSTEM_BUFFER
+        ) // max_bytes_per_run
 
         match self._inp_type:
             case IoType.DISPATCH:
