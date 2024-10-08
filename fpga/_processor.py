@@ -228,22 +228,12 @@ class Processor(neuro.Processor):
         self._hw_rx(self._hw_time - self._rx_time)
 
     def _hw_rx(self, runs: int) -> None:
-        self._interface.flush()
         num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
-        num_tr_bytes = (
-            num_rx_bytes
-            + width_bits_to_bytes(self._spk_fmt.calcsize())
-            + (
-                width_bits_to_bytes(self._cmd_fmt.calcsize())
-                if self._inp_type == IoType.DISPATCH
-                else 0
-            )
-        )
 
         for _ in range(runs):
             rx = self._interface.read(
                 num_rx_bytes,
-                100_000 * (num_tr_bytes) / self._interface.baudrate,
+                10.0,
             )[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
@@ -251,9 +241,7 @@ class Processor(neuro.Processor):
             match self._out_type:
                 case IoType.DISPATCH:
                     for _ in range(self._out_fmt.unpack(rx)[None]):
-                        sub_rx = self._interface.read(
-                            num_rx_bytes, 10 * num_rx_bytes / self._interface.baudrate
-                        )[::-1]
+                        sub_rx = self._interface.read(num_rx_bytes, 10.0)[::-1]
                         if len(sub_rx) != num_rx_bytes:
                             raise RuntimeError(
                                 "Did not receive coherent response from target."
