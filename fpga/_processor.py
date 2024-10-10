@@ -11,6 +11,7 @@ from heapq import heapify, heappop, heappush, merge
 from importlib import resources
 from json import load
 from math import inf
+from threading import Thread
 from time import sleep
 from typing import Iterable
 
@@ -30,6 +31,8 @@ from fpga.network import (
     proc_name,
     spike_value_factor,
 )
+
+SYSTEM_BUFFER = 4095
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -53,7 +56,7 @@ class _InpQueue(list):
         heappush(self, item)
 
     def extend(self, iterable: Iterable[neuro.Spike]) -> None:
-        self.__init__(merge(self, iterable))
+        [self.append(item) for item in iterable]
 
     def popleft(self) -> neuro.Spike:
         return heappop(self)
@@ -192,25 +195,28 @@ class Processor(neuro.Processor):
             self.output_count(out_idx) for out_idx in range(self._network.num_outputs())
         ]
 
-    def output_last_fire(self, out_idx: int) -> int:
+    def output_last_fire(self, out_idx: int) -> float:
         outs = self._out_since_last_run(out_idx)
         return outs[-1] if outs else -1
 
-    def output_last_fires(self) -> list[int]:
+    def output_last_fires(self) -> list[float]:
         return [
             self.output_last_fire(out_idx)
             for out_idx in range(self._network.num_outputs())
         ]
 
-    def output_vector(self, out_idx: int) -> list[int]:
+    def output_vector(self, out_idx: int) -> list[float]:
         return self._out_queue[out_idx]
 
-    def output_vectors(self) -> list[list[int]]:
+    def output_vectors(self) -> list[list[float]]:
         return [
             self._out_queue[out_idx] for out_idx in range(self._network.num_outputs())
         ]
 
     def run(self, time: int) -> None:
+        rx_thread = Thread(target=self._hw_rx, args=(time,))
+        rx_thread.daemon = True
+        rx_thread.start()
         self._last_run = self._hw_time
         target_time = self._hw_time + time
         while self._hw_time < target_time:
@@ -220,30 +226,21 @@ class Processor(neuro.Processor):
             run_time = int(self._inp_queue[0].time) if self._inp_queue else target_time
             while self._hw_time < run_time:
                 num_runs = min(self._max_run, run_time - self._hw_time)
-                runs_since_rx = self._hw_time - self._rx_time
-                if (num_runs + runs_since_rx) > self._max_run:
-                    self._hw_rx(runs_since_rx)
+                while (self._hw_time + num_runs - self._rx_time) > self._max_run:
+                    sleep(100e-9)
                 self._hw_tx(spikes, runs=num_runs)
                 spikes = []
-        self._hw_rx(self._hw_time - self._rx_time)
+        rx_thread.join()
 
     def _hw_rx(self, runs: int) -> None:
-        self._interface.flush()
         num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
-        num_tr_bytes = (
-            num_rx_bytes
-            + width_bits_to_bytes(self._spk_fmt.calcsize())
-            + (
-                width_bits_to_bytes(self._cmd_fmt.calcsize())
-                if self._inp_type == IoType.DISPATCH
-                else 0
-            )
-        )
 
         for _ in range(runs):
+            while self._rx_time == self._hw_time:
+                sleep(100e-9)
             rx = self._interface.read(
                 num_rx_bytes,
-                100_000 * (num_tr_bytes) / self._interface.baudrate,
+                10.0,
             )[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
@@ -251,21 +248,19 @@ class Processor(neuro.Processor):
             match self._out_type:
                 case IoType.DISPATCH:
                     for _ in range(self._out_fmt.unpack(rx)[None]):
-                        sub_rx = self._interface.read(
-                            num_rx_bytes, 10 * num_rx_bytes / self._interface.baudrate
-                        )[::-1]
+                        sub_rx = self._interface.read(num_rx_bytes, 10.0)[::-1]
                         if len(sub_rx) != num_rx_bytes:
                             raise RuntimeError(
                                 "Did not receive coherent response from target."
                             )
                         self._out_queue[self._out_fmt.unpack(sub_rx)[None]].append(
-                            self._rx_time
+                            float(self._rx_time)
                         )
 
                 case IoType.STREAM:
                     for out_idx, fire in self._out_fmt.unpack(rx).items():
                         if fire:
-                            self._out_queue[out_idx].append(self._rx_time)
+                            self._out_queue[out_idx].append(float(self._rx_time))
             self._rx_time += 1
 
     def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
@@ -285,7 +280,8 @@ class Processor(neuro.Processor):
         )
 
         def pause(runs: int) -> None:
-            sleep(max(self._secs_per_run * runs - tx_secs, 0.0))
+            self._hw_time += runs
+            sleep(max(self._secs_per_run * runs, 0.0))
 
         match self._inp_type:
             case IoType.DISPATCH:
@@ -324,9 +320,8 @@ class Processor(neuro.Processor):
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
-        self._hw_time += runs
 
-    def _out_since_last_run(self, out_idx) -> list[int]:
+    def _out_since_last_run(self, out_idx) -> list[float]:
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
@@ -520,8 +515,8 @@ class Processor(neuro.Processor):
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
         self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] // max_bytes_per_run
-        )
+            self._target_config["parameters"]["uart"]["buffer_tx"] + SYSTEM_BUFFER
+        ) // max_bytes_per_run
 
         match self._inp_type:
             case IoType.DISPATCH:
