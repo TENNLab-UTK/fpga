@@ -7,7 +7,7 @@ import os.path
 import pathlib as pl
 import sys
 from enum import Enum, IntEnum, auto
-from heapq import heapify, heappop, heappush, merge
+from heapq import heapify, heappop, heappush
 from importlib import resources
 from json import load
 from math import inf
@@ -272,12 +272,6 @@ class Processor(neuro.Processor):
         }
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
-
-        tx_secs = (
-            width_bits_to_bytes(self._spk_fmt.calcsize())
-            * 10
-            / self._interface.baudrate
-        )
 
         def pause(runs: int) -> None:
             self._hw_time += runs
