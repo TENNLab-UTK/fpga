@@ -101,7 +101,7 @@ def main():
             }
             for module in [
                 "axis_adapter",
-                "axis_uart",
+                "axis_fifo",
             ]
         ]
     )
@@ -113,6 +113,7 @@ def main():
             }
             for module in [
                 "axis_loop_proc",
+                "axis_uart",
                 "uart_processor",
             ]
         ]
