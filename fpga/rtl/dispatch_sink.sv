@@ -11,6 +11,7 @@
 package sink_config;
     import network_config::*;
     localparam int SNK_WIDTH = $clog2(NET_NUM_OUT + 1);
+    localparam int OUT_PER_RUN_MAX = NET_NUM_OUT + 1;
 endpackage
 
 import sink_config::*;

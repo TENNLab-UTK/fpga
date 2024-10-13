@@ -13,6 +13,7 @@
 package sink_config;
     import network_config::*;
     localparam int SNK_WIDTH = NET_NUM_OUT;
+    localparam int OUT_PER_RUN_MAX = 1;
 endpackage
 
 import sink_config::*;

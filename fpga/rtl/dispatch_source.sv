@@ -23,6 +23,7 @@ package source_config;
     localparam int OPC_WIDTH = $clog2(NUM_OPS);
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
+    localparam int RUN_MAX_BASE = 2;
 endpackage
 
 import source_config::*;

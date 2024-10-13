@@ -38,7 +38,7 @@ module axis_pipeline_register #
 )
 (
     input  wire                             clk,
-    input  wire                             rst,
+    input  wire                             arstn,
 
     /*
      * AXI input
@@ -93,26 +93,24 @@ module axis_pipeline_register #
     assign m_axis_tdest = axis_tdest[LENGTH];
     assign m_axis_tuser = axis_tuser[LENGTH];
 
+    genvar i;
     generate
-        genvar i;
 
         for (i = 0; i < LENGTH; i = i + 1) begin : pipe_reg
             axis_register #(
-                .DATA_WIDTH,
-                .KEEP_ENABLE,
-                .KEEP_WIDTH,
-                .LAST_ENABLE,
-                .ID_ENABLE,
-                .ID_WIDTH,
-                .DEST_ENABLE,
-                .DEST_WIDTH,
-                .USER_ENABLE,
-                .USER_WIDTH,
-                .REG_TYPE
+                .DATA_WIDTH(DATA_WIDTH),
+                .KEEP_ENABLE(KEEP_ENABLE),
+                .ID_ENABLE(ID_ENABLE),
+                .ID_WIDTH(ID_WIDTH),
+                .DEST_ENABLE(DEST_ENABLE),
+                .DEST_WIDTH(DEST_WIDTH),
+                .USER_ENABLE(USER_ENABLE),
+                .USER_WIDTH(USER_WIDTH),
+                .REG_TYPE(REG_TYPE)
             )
             reg_inst (
                 .clk(clk),
-                .rst(rst),
+                .arstn(arstn),
                 // AXI input
                 .s_axis_tdata(axis_tdata[i]),
                 .s_axis_tkeep(axis_tkeep[i]),

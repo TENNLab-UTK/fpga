@@ -14,7 +14,9 @@ import processor_config::*;
 
 module uart_processor #(
     parameter real CLK_FREQ,
-    parameter int BAUD_RATE = 115_200
+    parameter int BAUD_RATE = 115_200,
+    parameter int BUFFER_RX = 4096,
+    parameter int BUFFER_TX = 4096
 ) (
     input logic clk,
     input logic arstn,
@@ -26,6 +28,7 @@ module uart_processor #(
 );
     // Do not change unless adding support for UART parameters outside 8N1 (likely never)
     localparam int UART_WIDTH = 8;
+    localparam int UART_PADS = 2;
 
     logic [UART_WIDTH-1:0] rx_axis_tdata, tx_axis_tdata;
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
@@ -82,6 +85,46 @@ module uart_processor #(
         .m_axis_tready(out_axis_tready)
     );
 
+    // we buffer the rx side because there is no way of conveying backpressure to the host
+    // we don't buffer the tx side because the host has a buffer and the UART tx module exerts backpressure
+    // the question becomes how do we size the buffer?
+    // we need to anticipate how many packets we could receive while the processor is transmitting
+    // - for a Dispatch Source
+    //   - take the number of runs supported by the operand width (2 ^ run_width - 1)
+    //   - multiply by the amount of time per run (further below)
+    //   - divide by the time per packet (10 buad/byte * (out_width / 8) / baud_rate)
+    // - for a Stream Source, for a Stream Source, the strategy is to mirror the size of the linux host buffer: 4096 bytes
+    // the worst case run latency is driven by the UART baud rate, the system clock speed, and the sink mechanism
+    // for Dispatch Sink it's the sum of:
+    // - one clock per net_out
+    // - ten baud per byte; max_bytes is (net_out + 1) * (out_width / 8)
+    // for Stream Sink it's again ten baud per byte; max_bytes is (out_width / 8)
+    // clock cycle per bit actually transmitted, rounded up
+    localparam int CLK_PER_BIT = CLK_FREQ / (UART_WIDTH * BAUD_RATE / (UART_WIDTH + UART_PADS)) + 0.5;
+    // number of
+    localparam int BIT_PER_RUN_MAX = OUT_PER_RUN_MAX * OUT_WIDTH;
+    localparam int CLK_PER_RUN_MAX = CLK_PER_BIT * BIT_PER_RUN_MAX + OUT_PER_RUN_MAX - 1;
+    localparam int RUN_MAX = `min(RUN_MAX_BASE ** RUN_WIDTH - 1, `width_bytes_to_bits(BUFFER_RX) / BIT_PER_RUN_MAX);
+    localparam int CLK_MAX = CLK_PER_RUN_MAX * RUN_MAX;
+    localparam int BUF_BYTES = `max(BUFFER_RX, `width_bits_to_bytes(CLK_MAX / CLK_PER_BIT));
+
+    logic [UART_WIDTH-1:0] buf_axis_tdata;
+    logic buf_axis_tvalid, buf_axis_tready;
+
+    axis_pipeline_register #(
+        .DATA_WIDTH(UART_WIDTH),
+        .LENGTH(BUF_BYTES)
+    ) rx_buf (
+        .clk,
+        .arstn,
+        .s_axis_tdata(rx_axis_tdata),
+        .s_axis_tvalid(rx_axis_tvalid),
+        .s_axis_tready(rx_axis_tready),
+        .m_axis_tdata(buf_axis_tdata),
+        .m_axis_tvalid(buf_axis_tvalid),
+        .m_axis_tready(buf_axis_tready)
+    );
+
     axis_adapter #(
         .S_DATA_WIDTH(UART_WIDTH),
         .S_KEEP_ENABLE(0),
@@ -90,9 +133,9 @@ module uart_processor #(
     )  rx_inp_adapter (
         .clk,
         .arstn,
-        .s_axis_tdata(rx_axis_tdata),
-        .s_axis_tvalid(rx_axis_tvalid),
-        .s_axis_tready(rx_axis_tready),
+        .s_axis_tdata(buf_axis_tdata),
+        .s_axis_tvalid(buf_axis_tvalid),
+        .s_axis_tready(buf_axis_tready),
         .m_axis_tdata(inp_axis_tdata),
         .m_axis_tvalid(inp_axis_tvalid),
         .m_axis_tready(inp_axis_tready)
