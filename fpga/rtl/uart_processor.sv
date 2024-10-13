@@ -12,7 +12,8 @@
 
 module uart_processor #(
     parameter real CLK_FREQ,
-    parameter int BAUD_RATE = 115_200
+    parameter int BAUD_RATE = 115_200,
+    parameter int BUFFER_DEPTH = 4096
 ) (
     input logic clk,
     input logic arstn,
@@ -31,14 +32,9 @@ module uart_processor #(
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
     logic rx_frame_error, rx_overrun_error;
 
-    // This looks like odd code for a simple integer division, however
-    // 1. Vivado does not seem to truncate but ROUND decimals by default, so the solution would be $floor or $rtoi
-    // 2. Except Quartus won't synthesize code that uses $floor or $rtoi in even localparam math -_-
-    localparam int PRESCALE = (CLK_FREQ / real'(UART_WIDTH * BAUD_RATE) - 0.5);
-    logic [15:0] prescale;
-    assign prescale = PRESCALE;
-
     uart #(
+        .CLK_FREQ(CLK_FREQ),
+        .BAUD_RATE(BAUD_RATE),
         .DATA_WIDTH(UART_WIDTH)
     ) uart_inst (
         .clk,
@@ -54,8 +50,7 @@ module uart_processor #(
         .rx_busy,
         .tx_busy,
         .rx_frame_error,
-        .rx_overrun_error,
-        .prescale
+        .rx_overrun_error
     );
 
     always_ff @(posedge clk or negedge arstn) begin : set_rx_erorr
@@ -82,6 +77,29 @@ module uart_processor #(
         .m_axis_tready(out_axis_tready)
     );
 
+    logic [UART_WIDTH-1:0] buf_axis_tdata;
+    logic buf_axis_tvalid, buf_axis_tready;
+
+    axis_fifo #(
+        .DATA_WIDTH(UART_WIDTH),
+        .DEPTH(BUFFER_DEPTH),
+        .KEEP_ENABLE(0),
+        .LAST_ENABLE(0),
+        .USER_ENABLE(0)
+    ) rx_buf (
+        .clk,
+        .arstn,
+        .s_axis_tdata(rx_axis_tdata),
+        .s_axis_tvalid(rx_axis_tvalid),
+        .s_axis_tready(rx_axis_tready),
+        .m_axis_tdata(buf_axis_tdata),
+        .m_axis_tvalid(buf_axis_tvalid),
+        .m_axis_tready(buf_axis_tready)
+    );
+    // assign buf_axis_tvalid = rx_axis_tvalid;
+    // assign rx_axis_tready = buf_axis_tready;
+    // assign buf_axis_tdata = rx_axis_tdata;
+
     axis_adapter #(
         .S_DATA_WIDTH(UART_WIDTH),
         .S_KEEP_ENABLE(0),
@@ -90,9 +108,9 @@ module uart_processor #(
     )  rx_inp_adapter (
         .clk,
         .arstn,
-        .s_axis_tdata(rx_axis_tdata),
-        .s_axis_tvalid(rx_axis_tvalid),
-        .s_axis_tready(rx_axis_tready),
+        .s_axis_tdata(buf_axis_tdata),
+        .s_axis_tvalid(buf_axis_tvalid),
+        .s_axis_tready(buf_axis_tready),
         .m_axis_tdata(inp_axis_tdata),
         .m_axis_tvalid(inp_axis_tvalid),
         .m_axis_tready(inp_axis_tready)
