@@ -20,6 +20,7 @@ package source_config;
     localparam int OPC_WIDTH = 1;
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
+    localparam int RUN_MAX_BASE = 1;
 endpackage
 
 import source_config::*;
