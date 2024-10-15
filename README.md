@@ -17,6 +17,9 @@
 FPGA neuromorphic elements, networks, processors, tooling, and software interfaces.
 </div>
 
+Points of Contact: [Keegan Dent](https://github.com/keegandent), and 
+[Bryson Gullett](https://github.com/bgull00).
+
 ## 📝 Table of Contents
 
 - [About](#about)
@@ -186,7 +189,7 @@ See also the list of [contributors](https://github.com/TENNLab-UTK/fpga/graphs/c
 
 ## 🎉 Acknowledgements <a name = "acknowledgement"></a>
 
-- [UTK TENNLab](https://neuromorphic.eecs.utk.edu) researchers for the top-level API and funamental neromorphic processing behavior, including but not limited to:
+- [UTK TENNLab](https://neuromorphic.eecs.utk.edu) researchers for the top-level API and fundamental neromorphic processing behavior, including but not limited to:
     - Dr. James Plank
     - Dr. Catherine Schuman
     - Dr. Garrett Rose
