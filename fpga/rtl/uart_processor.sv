@@ -14,9 +14,9 @@ import processor_config::*;
 
 module uart_processor #(
     parameter real CLK_FREQ,
+    parameter int BRAM_BITS = 1_843_200,
     parameter int BAUD_RATE = 115_200,
-    parameter int BUFFER_RX = 4096,
-    parameter int BUFFER_TX = 4096
+    parameter int HOST_BUFFER = 4096
 ) (
     input logic clk,
     input logic arstn,
@@ -34,10 +34,7 @@ module uart_processor #(
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
     logic rx_frame_error, rx_overrun_error;
 
-    // This looks like odd code for a simple integer division, however
-    // 1. Vivado does not seem to truncate but ROUND decimals by default, so the solution would be $floor or $rtoi
-    // 2. Except Quartus won't synthesize code that uses $floor or $rtoi in even localparam math -_-
-    localparam int PRESCALE = (CLK_FREQ / real'(UART_WIDTH * BAUD_RATE) - 0.5);
+    localparam int PRESCALE = `floor(CLK_FREQ / real'(UART_WIDTH * BAUD_RATE));
     logic [15:0] prescale;
     assign prescale = PRESCALE;
 
@@ -99,24 +96,43 @@ module uart_processor #(
     // - one clock per net_out
     // - ten baud per byte; max_bytes is (net_out + 1) * (out_width / 8)
     // for Stream Sink it's again ten baud per byte; max_bytes is (out_width / 8)
-    // clock cycle per bit actually transmitted, rounded up
-    localparam int CLK_PER_BIT = CLK_FREQ / (UART_WIDTH * BAUD_RATE / (UART_WIDTH + UART_PADS)) + 0.5;
-    // number of
-    localparam int BIT_PER_RUN_MAX = OUT_PER_RUN_MAX * OUT_WIDTH;
-    localparam int CLK_PER_RUN_MAX = CLK_PER_BIT * BIT_PER_RUN_MAX + OUT_PER_RUN_MAX - 1;
-    localparam int RUN_MAX = `min(RUN_MAX_BASE ** RUN_WIDTH - 1, `width_bytes_to_bits(BUFFER_RX) / BIT_PER_RUN_MAX);
+
+    // UART character rate
+    localparam real CHAR_RATE = real'(BAUD_RATE) / real'(UART_WIDTH + UART_PADS);
+    // clock cycle per character actually transmitted
+    localparam real CLK_PER_CHAR = CLK_FREQ / CHAR_RATE;
+
+    localparam int OUT_CHAR_PER_RUN_MAX = (OUT_PER_RUN_MAX * OUT_WIDTH + UART_WIDTH - 1) / UART_WIDTH;
+    localparam int RUN_MAX = `max(RUN_MAX_BASE ** RUN_WIDTH - 1, HOST_BUFFER / OUT_CHAR_PER_RUN_MAX);
+    // maximum "RUN 1 time" for processor
+    localparam int CLK_PER_RUN_MAX = `ceil(CLK_PER_CHAR) * OUT_CHAR_PER_RUN_MAX + OUT_PER_RUN_MAX - 1;
+    // maximum "RUN X time" for processor
     localparam int CLK_MAX = CLK_PER_RUN_MAX * RUN_MAX;
-    localparam int BUF_BYTES = `max(BUFFER_RX, `width_bits_to_bytes(CLK_MAX / CLK_PER_BIT));
+
+    localparam int TARGET_BUF_DEPTH = `max(`cdiv(CLK_MAX, `floor(CLK_PER_CHAR)), HOST_BUFFER);
+    localparam int BRAM_DEPTH = `next_pow2(BRAM_BITS >> 1) / UART_WIDTH;
+    localparam int BUF_DEPTH = `min(TARGET_BUF_DEPTH, BRAM_DEPTH);
 
     logic [UART_WIDTH-1:0] buf_axis_tdata;
-    logic buf_axis_tvalid, buf_axis_tready;
+    logic buf_axis_tvalid, buf_axis_tready, rst;
 
-    axis_pipeline_register #(
+    always_ff @(posedge clk or negedge arstn) begin : set_rst
+        if (arstn == 0) begin
+            rst <= 1;
+        end else begin
+            rst <= 0;
+        end
+    end
+
+    axis_fifo #(
         .DATA_WIDTH(UART_WIDTH),
-        .LENGTH(BUF_BYTES)
+        .DEPTH(BUF_DEPTH),
+        .KEEP_ENABLE(0),
+        .LAST_ENABLE(0),
+        .USER_ENABLE(0)
     ) rx_buf (
         .clk,
-        .arstn,
+        .rst,
         .s_axis_tdata(rx_axis_tdata),
         .s_axis_tvalid(rx_axis_tvalid),
         .s_axis_tready(rx_axis_tready),
