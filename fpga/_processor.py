@@ -360,6 +360,7 @@ class Processor(neuro.Processor):
                 }
                 for module in [
                     "axis_adapter",
+                    "axis_fifo",
                     "axis_uart",
                 ]
             ]

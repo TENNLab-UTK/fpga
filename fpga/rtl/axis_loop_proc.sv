@@ -14,6 +14,9 @@ package processor_config;
     localparam int PROC_WIDTH_BYTES = 1;
     localparam int INP_WIDTH = `width_bytes_to_bits(PROC_WIDTH_BYTES);
     localparam int OUT_WIDTH = `width_bytes_to_bits(PROC_WIDTH_BYTES);
+    localparam int OUT_PER_RUN_MAX = 1;
+    localparam int RUN_MAX_BASE = 1;
+    localparam int RUN_WIDTH = 1;
 endpackage
 
 import processor_config::*;
