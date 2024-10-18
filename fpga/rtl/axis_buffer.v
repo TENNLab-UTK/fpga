@@ -63,12 +63,8 @@ module axis_buffer #
     (* ram_style = "block", ramstyle = "no_rw_check" *)
     reg [DATA_WIDTH-1:0] buffer [DEPTH-1:0];
 
-    always @(posedge clk or negedge arstn) begin : write_buffer
-        if (arstn == 0) begin : buffer_rst
-            integer i;
-            for (i = 0; i < DEPTH; i = i + 1)
-                buffer[i] <= 0;
-        end else if (wr_en) begin
+    always @(posedge clk) begin : write_buffer
+        if (wr_en) begin
             buffer[wr_ptr] <= s_axis_tdata;
         end
     end

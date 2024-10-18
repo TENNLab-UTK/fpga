@@ -60,7 +60,7 @@ module axis_fifo #
 )
 (
     input  wire                   clk,
-    input  wire                   rst,
+    input  wire                   arstn,
 
     /*
      * AXI input
@@ -101,6 +101,15 @@ module axis_fifo #
     output wire                   status_bad_frame,
     output wire                   status_good_frame
 );
+    reg rst;
+    always @(posedge clk or negedge arstn) begin
+        if (arstn == 0) begin
+            rst <= 1;
+        end else begin
+            rst <= 0;
+        end
+    end
+
     localparam KEEP_WIDTH = (DATA_WIDTH + 7) / 8;
     localparam ADDR_WIDTH = (KEEP_ENABLE && KEEP_WIDTH > 1) ? $clog2(DEPTH/KEEP_WIDTH) : $clog2(DEPTH);
     localparam CL_KEEP_WDITH = $clog2(KEEP_WIDTH);

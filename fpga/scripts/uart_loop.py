@@ -101,7 +101,7 @@ def main():
             }
             for module in [
                 "axis_adapter",
-                "axis_buffer",
+                "axis_fifo",
                 "axis_uart",
             ]
         ]
