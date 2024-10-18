@@ -116,22 +116,25 @@ module uart_processor #(
     logic [UART_WIDTH-1:0] buf_axis_tdata;
     logic buf_axis_tvalid, buf_axis_tready;
 
-    // axis_buffer #(
-    //     .DATA_WIDTH(UART_WIDTH),
-    //     .DEPTH(16)
-    // ) rx_buf (
-    //     .clk,
-    //     .arstn,
-    //     .s_axis_tdata(rx_axis_tdata),
-    //     .s_axis_tvalid(rx_axis_tvalid),
-    //     .s_axis_tready(rx_axis_tready),
-    //     .m_axis_tdata(buf_axis_tdata),
-    //     .m_axis_tvalid(buf_axis_tvalid),
-    //     .m_axis_tready(buf_axis_tready)
-    // );
-    assign buf_axis_tvalid = rx_axis_tvalid;
-    assign rx_axis_tready = buf_axis_tready;
-    assign buf_axis_tdata = rx_axis_tdata;
+    axis_fifo #(
+        .DATA_WIDTH(UART_WIDTH),
+        .DEPTH(BUF_DEPTH),
+        .KEEP_ENABLE(0),
+        .LAST_ENABLE(0),
+        .USER_ENABLE(0)
+    ) rx_buf (
+        .clk,
+        .arstn,
+        .s_axis_tdata(rx_axis_tdata),
+        .s_axis_tvalid(rx_axis_tvalid),
+        .s_axis_tready(rx_axis_tready),
+        .m_axis_tdata(buf_axis_tdata),
+        .m_axis_tvalid(buf_axis_tvalid),
+        .m_axis_tready(buf_axis_tready)
+    );
+    // assign buf_axis_tvalid = rx_axis_tvalid;
+    // assign rx_axis_tready = buf_axis_tready;
+    // assign buf_axis_tdata = rx_axis_tdata;
 
     axis_adapter #(
         .S_DATA_WIDTH(UART_WIDTH),
