@@ -13,10 +13,10 @@
 `define max(x, y) ((x) > (y) ? (x) : (y))
 `define min(x, y) ((x) < (y) ? (x) : (y))
 `define abs(x) ((x) < 0 ? -(x) : (x))
-`define sign(x) ((x) < 0 ? -1 : 1)
-`define floor(x) (`_ir(x) > (x) : `_ir(x) - 1 : `_ir(x))
-`define ceil(x) (`_ir(x) < (x) : `_ir(x) + 1 : `_ir(x))
-`define rtoi(x) (`abs(`_ir(x)) > `abs(x) : `_ir(x) - `sign(x) : `_ir(x))
+`define sign(x) (((x) < 0) ? -1 : 1)
+`define floor(x) (`_ir(x) > (x) ? `_ir(x) - 1 : `_ir(x))
+`define ceil(x) (`_ir(x) < (x) ? `_ir(x) + 1 : `_ir(x))
+`define rtoi(x) (`abs(`_ir(x)) > `abs(x) ? `_ir(x) - `sign(x) : `_ir(x))
 
 // width conversion helper functions
 `define cdiv(x, y) (((x) + (y) - 1) / (y))
