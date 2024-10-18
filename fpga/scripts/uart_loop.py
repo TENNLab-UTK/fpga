@@ -99,7 +99,7 @@ def main():
             }
             for module in [
                 "axis_adapter",
-                "axis_fifo",
+                "axis_buffer",
                 "axis_uart",
             ]
         ]
