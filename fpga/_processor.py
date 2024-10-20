@@ -32,7 +32,7 @@ from fpga.network import (
     spike_value_factor,
 )
 
-SYSTEM_BUFFER = 4095
+SYSTEM_BUFFER = 4096
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -275,7 +275,7 @@ class Processor(neuro.Processor):
 
         def pause(runs: int) -> None:
             self._hw_time += runs
-            sleep(max(self._secs_per_run * runs, 0.0))
+            sleep(self._secs_per_run * runs)
 
         match self._inp_type:
             case IoType.DISPATCH:
@@ -441,7 +441,7 @@ class Processor(neuro.Processor):
 
         # https://github.com/olofk/edalize/issues/428
         backend = get_edatool(self._target_config["default_tool"])(
-            edam=edam, work_root=proj_path, verbose=False
+            edam=edam, work_root=proj_path, verbose=True
         )
 
         proj_path.mkdir(parents=True, exist_ok=True)
@@ -508,9 +508,7 @@ class Processor(neuro.Processor):
             case _:
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
-        self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] + SYSTEM_BUFFER
-        ) // max_bytes_per_run
+        self._max_run = SYSTEM_BUFFER // max_bytes_per_run
 
         match self._inp_type:
             case IoType.DISPATCH:

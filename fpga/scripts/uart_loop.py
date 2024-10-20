@@ -180,7 +180,7 @@ def main():
             "toplevel": "uart_top",
             "tool_options": tool_options,
         }
-        backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=False)
+        backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=True)
         with open(proj_path / "build.log", "w", buffering=1) as log:
             backend.stdout = log
             backend.stderr = log
