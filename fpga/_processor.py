@@ -188,7 +188,7 @@ class Processor(neuro.Processor):
         self.clear_activity()
 
     def output_count(self, out_idx: int) -> int:
-        return len(self._out_since_last_run(out_idx))
+        return len(self.output_vector(out_idx))
 
     def output_counts(self) -> list[int]:
         return [
@@ -196,7 +196,7 @@ class Processor(neuro.Processor):
         ]
 
     def output_last_fire(self, out_idx: int) -> float:
-        outs = self._out_since_last_run(out_idx)
+        outs = self.output_vector(out_idx)
         return outs[-1] if outs else -1
 
     def output_last_fires(self) -> list[float]:
@@ -206,11 +206,14 @@ class Processor(neuro.Processor):
         ]
 
     def output_vector(self, out_idx: int) -> list[float]:
-        return self._out_queue[out_idx]
+        return [
+            t - self._last_run for t in self._out_queue[out_idx] if t >= self._last_run
+        ]
 
     def output_vectors(self) -> list[list[float]]:
         return [
-            self._out_queue[out_idx] for out_idx in range(self._network.num_outputs())
+            self.output_vector(out_idx)
+            for out_idx in range(self._network.num_outputs())
         ]
 
     def run(self, time: int) -> None:
@@ -320,9 +323,6 @@ class Processor(neuro.Processor):
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
-
-    def _out_since_last_run(self, out_idx) -> list[float]:
-        return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
         proc = proc_name(self._network)
