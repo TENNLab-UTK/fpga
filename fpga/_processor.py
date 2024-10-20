@@ -146,14 +146,11 @@ class Processor(neuro.Processor):
 
         self.clear()
 
-    def apply_spikes(self, spikes: list[neuro.Spike]) -> None:
-        if any(s.time < 0 for s in spikes):
+    def apply_spike(self, spike: neuro.Spike) -> None:
+        if spike.time < 0:
             raise RuntimeError("Spikes cannot be scheduled in the past.")
-        self._inp_queue.extend(
-            [
-                neuro.Spike(spike.id, spike.time + self._hw_time, spike.value)
-                for spike in spikes
-            ]
+        self._inp_queue.append(
+            neuro.Spike(spike.id, spike.time + self._hw_time, spike.value)
         )
         if self._inp_type == IoType.DISPATCH:
             spikes_now = []
@@ -161,6 +158,9 @@ class Processor(neuro.Processor):
                 # send these spikes as soon as they arrive to reduce latency
                 spikes_now.append(self._inp_queue.popleft())
             self._hw_tx(spikes_now, runs=0)
+
+    def apply_spikes(self, spikes: list[neuro.Spike]) -> None:
+        [self.apply_spike(spike) for spike in spikes]
 
     def clear(self) -> None:
         self.clear_activity()
