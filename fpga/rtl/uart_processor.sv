@@ -14,7 +14,7 @@ import processor_config::*;
 
 module uart_processor #(
     parameter real CLK_FREQ,
-    parameter int BRAM_BITS = 1_843_200,
+    parameter int BRAM_BITS,
     parameter int BAUD_RATE = 115_200,
     parameter int HOST_BUFFER = 4096
 ) (
@@ -102,15 +102,19 @@ module uart_processor #(
     // clock cycle per character actually transmitted
     localparam real CLK_PER_CHAR = CLK_FREQ / CHAR_RATE;
 
-    localparam int OUT_CHAR_PER_RUN_MAX = (OUT_PER_RUN_MAX * OUT_WIDTH + UART_WIDTH - 1) / UART_WIDTH;
-    localparam int RUN_MAX = `max(RUN_MAX_BASE ** RUN_WIDTH - 1, HOST_BUFFER / OUT_CHAR_PER_RUN_MAX);
+    // maximum number of characters output per run
+    localparam int MAX_CHAR_PER_RUN = (MAX_OUT_PER_RUN * OUT_WIDTH + UART_WIDTH - 1) / UART_WIDTH;
+    // maximum burst size in runs
+    localparam int MAX_RUN = `max(RUN_MAX_BASE ** RUN_WIDTH - 1, HOST_BUFFER / MAX_CHAR_PER_RUN);
     // maximum "RUN 1 time" for processor
-    localparam int CLK_PER_RUN_MAX = `ceil(CLK_PER_CHAR) * OUT_CHAR_PER_RUN_MAX + OUT_PER_RUN_MAX - 1;
-    // maximum "RUN X time" for processor
-    localparam int CLK_MAX = CLK_PER_RUN_MAX * RUN_MAX;
+    localparam int MAX_CLK_PER_RUN = `ceil(CLK_PER_CHAR) * MAX_CHAR_PER_RUN + MAX_OUT_PER_RUN - 1;
+    // maximum "RUN X time" for processor where X is maximum burst size in runs
+    localparam int MAX_CLK = MAX_CLK_PER_RUN * MAX_RUN;
 
-    localparam int TARGET_BUF_DEPTH = `max(`cdiv(CLK_MAX, `floor(CLK_PER_CHAR)), HOST_BUFFER);
+    // maximum potential missed characters during ideal run burst, maxed with host buffer size
+    localparam int TARGET_BUF_DEPTH = `max(`cdiv(MAX_CLK, `floor(CLK_PER_CHAR)), HOST_BUFFER);
     localparam int BRAM_DEPTH = `next_pow2(BRAM_BITS >> 1) / UART_WIDTH;
+    // actual buffer depth we can use based on BRAM size
     localparam int BUF_DEPTH = `min(TARGET_BUF_DEPTH, BRAM_DEPTH);
 
     logic [UART_WIDTH-1:0] buf_axis_tdata;

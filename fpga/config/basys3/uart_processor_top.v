@@ -10,7 +10,9 @@
 
 module uart_top #(
     parameter real CLK_FREQ = 100_000_000,
-    parameter integer BAUD_RATE = 115_200
+    parameter integer BRAM_BITS = 1_843_200,
+    parameter integer BAUD_RATE = 115_200,
+    parameter integer HOST_BUFFER = 4096
 ) (
     input wire clk,
     input wire btnC,
@@ -20,7 +22,9 @@ module uart_top #(
 );
     uart_processor #(
         .CLK_FREQ(CLK_FREQ),
-        .BAUD_RATE(BAUD_RATE)
+        .BRAM_BITS(BRAM_BITS),
+        .BAUD_RATE(BAUD_RATE),
+        .HOST_BUFFER(HOST_BUFFER)
     ) uart_proc (
         .clk(clk),
         .arstn(!btnC),

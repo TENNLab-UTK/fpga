@@ -6,11 +6,12 @@
 import os.path
 import pathlib as pl
 import sys
+from collections import deque
 from enum import Enum, IntEnum, auto
-from heapq import heapify, heappop, heappush, merge
+from heapq import heapify, heappop, heappush
 from importlib import resources
 from json import load
-from math import inf
+from math import ceil, floor, inf
 from threading import Thread
 from time import sleep
 from typing import Iterable
@@ -22,7 +23,12 @@ from periphery import Serial
 
 import fpga
 from fpga import config, rtl
-from fpga._math import unsigned_width, width_bits_to_bytes, width_nearest_byte
+from fpga._math import (
+    next_pow2,
+    unsigned_width,
+    width_bits_to_bytes,
+    width_nearest_byte,
+)
 from fpga.network import (
     HASH_LEN,
     build_network_sv,
@@ -178,6 +184,8 @@ class Processor(neuro.Processor):
         self._last_run = inf
         self._hw_time = 0
         self._rx_time = 0
+        self._in_limbo = deque([0])
+        self.__max_behind = 0
 
     def load_network(self, net: neuro.Network) -> None:
         self.clear()
@@ -224,44 +232,75 @@ class Processor(neuro.Processor):
             while self._inp_queue and int(self._inp_queue[0].time) == self._hw_time:
                 spikes.append(self._inp_queue.popleft())
             run_time = int(self._inp_queue[0].time) if self._inp_queue else target_time
-            while self._hw_time < run_time:
-                num_runs = min(self._max_run, run_time - self._hw_time)
-                while (self._hw_time + num_runs - self._rx_time) > self._max_run:
-                    sleep(100e-9)
-                self._hw_tx(spikes, runs=num_runs)
-                spikes = []
+            self._hw_tx(spikes, runs=(run_time - self._hw_time))
         rx_thread.join()
 
     def _hw_rx(self, runs: int) -> None:
+        start = self._rx_time
         num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
 
-        for _ in range(runs):
-            while self._rx_time == self._hw_time:
-                sleep(100e-9)
-            rx = self._interface.read(
-                num_rx_bytes,
-                10.0,
-            )[::-1]
-            if len(rx) != num_rx_bytes:
-                raise RuntimeError("Did not receive coherent response from target.")
+        # for _ in range(runs):
+        #     while self._rx_time == self._hw_time:
+        #         sleep(1e-6)
+        #     if (self._hw_time - self._rx_time) > self.__max_behind:
+        #         self.__max_behind = self._hw_time - self._rx_time
+        #         print(f"Max behind: {self.__max_behind}")
+        #         print(f"Input waiting: {self._interface.input_waiting()}")
+        #     rx = self._interface.read(
+        #         num_rx_bytes,
+        #         10.0,
+        #     )[::-1]
+        #     if len(rx) != num_rx_bytes:
+        #         raise RuntimeError("Did not receive coherent response from target.")
 
-            match self._out_type:
-                case IoType.DISPATCH:
-                    for _ in range(self._out_fmt.unpack(rx)[None]):
-                        sub_rx = self._interface.read(num_rx_bytes, 10.0)[::-1]
-                        if len(sub_rx) != num_rx_bytes:
-                            raise RuntimeError(
-                                "Did not receive coherent response from target."
+        #     match self._out_type:
+        #         case IoType.DISPATCH:
+        #             for _ in range(self._out_fmt.unpack(rx)[None]):
+        #                 sub_rx = self._interface.read(num_rx_bytes, 10.0)[::-1]
+        #                 if len(sub_rx) != num_rx_bytes:
+        #                     raise RuntimeError(
+        #                         "Did not receive coherent response from target."
+        #                     )
+        #                 self._out_queue[self._out_fmt.unpack(sub_rx)[None]].append(
+        #                     float(self._rx_time)
+        #                 )
+
+        #         case IoType.STREAM:
+        #             [
+        #                 self._out_queue[out_idx].append(float(self._rx_time))
+        #                 for out_idx, fire in self._out_fmt.unpack(rx).items()
+        #                 if fire
+        #             ]
+        #     self._in_limbo.popleft()
+        #     self._rx_time += 1
+        max_bytes = self._max_bytes_per_run * runs
+
+        while self._rx_time < start + runs:
+            big_rx = self._interface.read(
+                max_bytes, 2 * max_bytes * 10.0 / self._interface.baudrate
+            )
+
+            i = 0
+            while i < len(big_rx):
+                rx = big_rx[i : i + num_rx_bytes][::-1]
+                i += num_rx_bytes
+
+                match self._out_type:
+                    case IoType.DISPATCH:
+                        for _ in range(self._out_fmt.unpack(rx)[None]):
+                            rx = big_rx[i : i + num_rx_bytes][::-1]
+                            i += num_rx_bytes
+                            self._out_queue[self._out_fmt.unpack(rx)[None]].append(
+                                float(self._rx_time)
                             )
-                        self._out_queue[self._out_fmt.unpack(sub_rx)[None]].append(
-                            float(self._rx_time)
-                        )
 
-                case IoType.STREAM:
-                    for out_idx, fire in self._out_fmt.unpack(rx).items():
-                        if fire:
+                    case IoType.STREAM:
+                        [
                             self._out_queue[out_idx].append(float(self._rx_time))
-            self._rx_time += 1
+                            for out_idx, fire in self._out_fmt.unpack(rx).items()
+                            if fire
+                        ]
+                self._rx_time += 1
 
     def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
         spike_dict = {
@@ -273,33 +312,51 @@ class Processor(neuro.Processor):
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
 
-        tx_secs = (
-            width_bits_to_bytes(self._spk_fmt.calcsize())
-            * 10
-            / self._interface.baudrate
-        )
+        burst = self._run_burst >> 2
 
-        def pause(runs: int) -> None:
+        def send(packet: bytes, runs: int) -> None:
+            # size = len(packet)
+            # while (sum(self._in_limbo) + size >= self._buffer_depth >> 1) or (
+            #     self._hw_time - self._rx_time >= burst
+            # ):
+            #     self._interface.flush()
+            #     sleep(10e-6)
+            self._interface.write(packet)
+            # self._in_limbo[-1] += size
+            # self._in_limbo.extend([0] * runs)
             self._hw_time += runs
-            sleep(max(self._secs_per_run * runs, 0.0))
 
         match self._inp_type:
             case IoType.DISPATCH:
                 [
-                    self._interface.write(
+                    send(
                         self._spk_fmt.pack(
                             {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val}
-                        )[::-1]
+                        )[::-1],
+                        0,
                     )
                     for idx, val in spike_dict.items()
                 ]
-                if runs:
-                    self._interface.write(
+                for _ in range(runs // burst):
+                    send(
                         self._cmd_fmt.pack(
-                            {"opcode": self._Opcode.RUN, "operand": runs}
-                        )[::-1]
+                            {
+                                "opcode": self._Opcode.RUN,
+                                "operand": burst,
+                            }
+                        )[::-1],
+                        burst,
                     )
-                    pause(runs)
+                if runs % burst:
+                    send(
+                        self._cmd_fmt.pack(
+                            {
+                                "opcode": self._Opcode.RUN,
+                                "operand": runs % burst,
+                            }
+                        )[::-1],
+                        runs % burst,
+                    )
 
             case IoType.STREAM:
                 if not runs:
@@ -314,12 +371,10 @@ class Processor(neuro.Processor):
 
                 if self._hw_time == 0:
                     spike_dict["opcode"] = self._Opcode.CLR
-                self._interface.write(self._spk_fmt.pack(spike_dict)[::-1])
-                pause(1)
+                send(self._spk_fmt.pack(spike_dict)[::-1], 1)
 
                 for _ in range(runs - 1):
-                    self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
-                    pause(1)
+                    send(self._spk_fmt.pack(run_dict)[::-1], 1)
 
     def _out_since_last_run(self, out_idx) -> list[float]:
         return [t for t in self._out_queue[out_idx] if t >= self._last_run]
@@ -484,33 +539,37 @@ class Processor(neuro.Processor):
         self._spk_fmt = bs.compile(spk_fmt_str, spk_names)
 
     def _set_comm_limits(self):
-        self._secs_per_run = 0.0
+        byte_rate = self._interface.baudrate / 10.0
+        clk_per_byte = self._target_config["parameters"]["clk_freq"] / byte_rate
+        self._max_bytes_per_run = width_bits_to_bytes(self._out_fmt.calcsize())
+        max_clk_per_run = 0
 
-        max_bytes_per_run = width_bits_to_bytes(self._out_fmt.calcsize())
         match self._out_type:
             case IoType.DISPATCH:
-                max_bytes_per_run *= self._network.num_outputs() + 1
-                self._secs_per_run += (
-                    self._network.num_outputs()
-                    / self._target_config["parameters"]["clk_freq"]
-                )
+                self._max_bytes_per_run *= self._network.num_outputs() + 1
+                max_clk_per_run += self._network.num_outputs()
             case IoType.STREAM:
-                pass
+                max_clk_per_run += 1
             case _:
                 raise ValueError()
-        self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
-        self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] + SYSTEM_BUFFER
-        ) // max_bytes_per_run
+        max_clk_per_run += self._max_bytes_per_run * ceil(clk_per_byte)
 
+        self._run_burst = SYSTEM_BUFFER // self._max_bytes_per_run
+        max_run = self._run_burst
         match self._inp_type:
             case IoType.DISPATCH:
-                # limited by both buffer size and command field width
-                self._max_run = min(
+                # limited by command field width
+                max_run = max(
                     2 ** (self._cmd_fmt._infos[1].size) - 1,
-                    self._max_run,
+                    self._run_burst,
                 )
             case IoType.STREAM:
                 pass
             case _:
                 raise ValueError()
+
+        max_clk = max_run * max_clk_per_run
+        target_buffer = ceil(max_clk / floor(clk_per_byte))
+        bram_depth = self._target_config["parameters"]["bram_bits"] // 8
+
+        self._buffer_depth = next_pow2(min(target_buffer, bram_depth) >> 1)

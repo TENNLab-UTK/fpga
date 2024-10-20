@@ -3,6 +3,7 @@
         "default_tool": "vivado",
         "parameters": {
             "clk_freq": 100000000.0,
+            "bram_bits": 1843200,
             "uart": {
                 "baud_rates": [
                     115200,
@@ -15,9 +16,7 @@
                     2000000,
                     3000000,
                     4000000
-                ],
-                "buffer_rx": 4096,
-                "buffer_tx": 4096
+                ]
             }
         },
         "tools": {

@@ -10,6 +10,10 @@ def clog2(value: float) -> int:
     return int(ceil(log2(value)))
 
 
+def next_pow2(value: int) -> int:
+    return 2 ** clog2(int(ceil(value)))
+
+
 def signed_width(value: int) -> int:
     return clog2(abs(value) + int(value >= 0)) + 1
 
