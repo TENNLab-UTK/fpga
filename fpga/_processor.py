@@ -147,9 +147,14 @@ class Processor(neuro.Processor):
         self.clear()
 
     def apply_spikes(self, spikes: list[neuro.Spike]) -> None:
-        self._inp_queue.extend(spikes)
-        if any(s.time < self._hw_time for s in spikes):
+        if any(s.time < 0 for s in spikes):
             raise RuntimeError("Spikes cannot be scheduled in the past.")
+        self._inp_queue.extend(
+            [
+                neuro.Spike(spike.id, spike.time + self._hw_time, spike.value)
+                for spike in spikes
+            ]
+        )
         if self._inp_type == IoType.DISPATCH:
             spikes_now = []
             while self._inp_queue and self._inp_queue[0].time == self._hw_time:
