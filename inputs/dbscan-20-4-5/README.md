@@ -13,7 +13,7 @@ size:
 In the directory `grids`, there are 100 input grids for testing that are 20x100.
 They are sparse (5% full).
 
-In the directory `inputs`, there are 100 files containing the 'AS' (apply_spikes) commands
+In the `spikes` directory, there are 100 files containing the 'AS' (apply_spikes) commands
 for the grids.  There are roughly 100 spikes per file.
 
 I have created two benchmarking inputs from these:
