@@ -72,18 +72,24 @@ module network_source #(
     end
 
     logic [$clog2(NET_NUM_INP + 1) - 1 : 0] inp_idx;
-    if (SPK_WIDTH == NET_CHARGE_WIDTH)
-        assign inp_idx = 0;
-    else
-        assign inp_idx = src[(`SRC_WIDTH - OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
+    generate
+        if (SPK_WIDTH == NET_CHARGE_WIDTH)
+            assign inp_idx = 0;
+        else
+            assign inp_idx = src[(`SRC_WIDTH - OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
+    endgenerate
 
     logic signed [NET_CHARGE_WIDTH-1:0] inp_val;
     assign inp_val = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
 
     always_ff @(posedge clk or negedge arstn) begin: set_net_inp
-        if (arstn == 0 || op == CLR) begin
+        if (arstn == 0) begin
             net_arstn <= 0;
-            foreach (net_inp[i])
+            for (int i = 0; i < NET_NUM_INP; i++)
+                net_inp[i] <= 0;
+        end else if (op == CLR) begin   // Quartus synthesis demands this be a separate conditional block
+            net_arstn <= 0;
+            for (int i = 0; i < NET_NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
             net_arstn <= 1;
@@ -92,7 +98,7 @@ module network_source #(
                 net_inp[inp_idx] <= inp_val;
             end else if (net_valid) begin
                 // reset inputs every time network is run
-                foreach (net_inp[i])
+                for (int i = 0; i < NET_NUM_INP; i++)
                     net_inp[i] <= 0;
             end
         end

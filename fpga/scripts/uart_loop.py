@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 from importlib import resources
 from json import dump, load
 
-from edalize.edatool import get_edatool
+from edalize.edatool import get_edatool, run
 from periphery import Serial
 from tqdm import tqdm
 
@@ -36,6 +36,8 @@ RATES = [
     3500000,
     4000000,
 ]
+
+JTAG_TRIES = 3
 
 
 def main():
@@ -115,6 +117,12 @@ def main():
             ]
         ]
     )
+    files.append(
+        {
+            "name": str(config_path / f"{args.target}" / "uart_processor_top.v"),
+            "file_type": "verilogSource",
+        }
+    )
 
     tool_options = target_config["tools"]
     tool = target_config["default_tool"]
@@ -122,17 +130,22 @@ def main():
 
     if tool == "vivado":
         tool_options["vivado"]["source_mgmt_mode"] = "All"
+        files.append(
+            {
+                "name": str(config_path / f"{args.target}" / f"{args.target}.xdc"),
+                "file_type": "xdc",
+            }
+        )
+    elif tool == "quartus":
         files.extend(
             [
                 {
-                    "name": str(
-                        config_path / f"{args.target}" / "uart_processor_top.v"
-                    ),
-                    "file_type": "verilogSource",
+                    "name": str(config_path / f"{args.target}" / f"{args.target}.qsf"),
+                    "file_type": "tclSource",
                 },
                 {
-                    "name": str(config_path / f"{args.target}" / f"{args.target}.xdc"),
-                    "file_type": "xdc",
+                    "name": str(config_path / f"{args.target}" / f"{args.target}.sdc"),
+                    "file_type": "SDC",
                 },
             ]
         )
@@ -167,7 +180,7 @@ def main():
             "toplevel": "uart_top",
             "tool_options": tool_options,
         }
-        backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=False)
+        backend = get_edatool(tool)(edam=edam, work_root=proj_path, verbose=True)
         with open(proj_path / "build.log", "w", buffering=1) as log:
             backend.stdout = log
             backend.stderr = log
@@ -199,6 +212,23 @@ def main():
                 f"TESTING BAUD RATE {rate}".center(os.get_terminal_size().columns, "=")
             )
             print("PROGRAMMING START".center(os.get_terminal_size().columns, "-"))
+            if tool == "quartus":
+                print("Verifying JTAG chain is available.")
+                # HACK: Intel's jtagd is like a really old combustion engine.
+                # It has to be beaten with a wrench a few times to get started
+                success = False
+                tries = 0
+                while not success and (tries < JTAG_TRIES):
+                    tries += 1
+                    print(f"Attempt {tries} of {JTAG_TRIES}")
+                    cp = run("jtagconfig", capture_output=True)
+                    out = cp.stdout.decode()
+                    success = "Unable to lock chain" not in out
+                if not success:
+                    raise RuntimeError("Failed to connect to JTAG chain.\n" + out)
+                print("JTAG chain available.")
+                print(out)
+
             backend.run()
             print("PROGRAMMING END".center(os.get_terminal_size().columns, "-"))
 

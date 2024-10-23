@@ -26,5 +26,32 @@
                 "pgm": "vivado"
             }
         }
+    },
+    "c5g": {
+        "default_tool": "quartus",
+        "parameters": {
+            "clk_freq": 50000000.0,
+            "uart": {
+                "baud_rates": [
+                    115200,
+                    230400,
+                    460800,
+                    500000,
+                    1000000,
+                    1500000,
+                    2000000
+                ],
+                "buffer_rx": 128,
+                "buffer_tx": 256
+            }
+        },
+        "tools": {
+            "quartus": {
+                "cable": "USB-Blaster",
+                "family": "Cyclone V",
+                "device": "5CGXFC5C6F27C7",
+                "pgm": "quartus"
+            }
+        }
     }
 }
