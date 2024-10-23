@@ -40,7 +40,8 @@ module risp_neuron #(
     always_comb begin: calc_do_fire
         // determine if neuron fires this cycle
         sum = LEAK ? FUSE_START : fuse;
-        foreach(inp[i]) sum -= inp[i];
+        for (int i = 0; i < NUM_INP; i++)
+            sum -= inp[i];
         do_fire = sum <= 0;
     end
 
@@ -56,16 +57,18 @@ module risp_neuron #(
         end
     end
 
-    if (FIRE_LIKE_RAVENS) begin
-        always_ff @(posedge clk or negedge arstn) begin: set_fire
-            if (arstn == 0) begin
-                fire <= 0;
-            end else if (en) begin
-                fire <= do_fire;
-            end
-        end
-    end else begin
-        assign fire = do_fire;
-    end
+    generate
+         if (FIRE_LIKE_RAVENS) begin
+              always_ff @(posedge clk or negedge arstn) begin: set_fire
+                    if (arstn == 0) begin
+                         fire <= 0;
+                    end else if (en) begin
+                         fire <= do_fire;
+                    end
+              end
+         end else begin
+              assign fire = do_fire;
+         end
+    endgenerate
 
 endmodule

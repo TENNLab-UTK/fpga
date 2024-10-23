@@ -27,9 +27,10 @@ module risp_synapse #(
 
     assign out = fifo[TRUE_DELAY] ? WEIGHT : 0;
 
+    genvar i;
     generate
         // starts with 1 so we don't generate a register for 0 delay
-        for (genvar i = 1; i < TRUE_DELAY + 1; ++i) begin: delay_chain
+        for (i = 1; i < TRUE_DELAY + 1; ++i) begin: delay_chain
             always_ff @(posedge clk or negedge arstn) begin
                 if (arstn == 0) begin
                     fifo[i] <= 0;

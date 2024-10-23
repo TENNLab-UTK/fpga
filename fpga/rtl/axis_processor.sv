@@ -29,7 +29,8 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    logic net_valid, net_ready;
+    logic net_valid, net_ready, net_arstn;
+    logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
     logic [NET_NUM_OUT-1:0] net_out;
 
     network_source #(
@@ -41,16 +42,20 @@ module axis_processor (
         .src_ready(s_axis_tready),
         .src(s_axis_tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
         .net_ready,
-        .net_valid
+        .net_valid,
+        .net_arstn,
+        .net_inp
     );
 
     network net (
         .clk,
-        .arstn(source.net_arstn),
+        .arstn(net_arstn),
         .en(net_valid && net_ready),
-        .inp(source.net_inp),
+        .inp(net_inp),
         .out(net_out)
     );
+
+    logic [SNK_WIDTH-1:0] snk;
 
     network_sink sink (
         .clk,
@@ -59,11 +64,12 @@ module axis_processor (
         .net_ready,
         .net_out,
         .snk_ready(m_axis_tready),
-        .snk_valid(m_axis_tvalid)
+        .snk_valid(m_axis_tvalid),
+        .snk
     );
 
     always_comb begin : calc_m_axis_tdata
         m_axis_tdata[OUT_WIDTH-1:0] = 0;
-        m_axis_tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = sink.snk;
+        m_axis_tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = snk;
     end
 endmodule

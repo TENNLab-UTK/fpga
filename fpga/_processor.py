@@ -7,7 +7,7 @@ import os.path
 import pathlib as pl
 import sys
 from enum import Enum, IntEnum, auto
-from heapq import heapify, heappop, heappush, merge
+from heapq import heapify, heappop, heappush
 from importlib import resources
 from json import load
 from math import inf
@@ -32,7 +32,7 @@ from fpga.network import (
     spike_value_factor,
 )
 
-SYSTEM_BUFFER = 4095
+SYSTEM_BUFFER = 4096
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -146,16 +146,21 @@ class Processor(neuro.Processor):
 
         self.clear()
 
-    def apply_spikes(self, spikes: list[neuro.Spike]) -> None:
-        self._inp_queue.extend(spikes)
-        if any(s.time < self._hw_time for s in spikes):
+    def apply_spike(self, spike: neuro.Spike) -> None:
+        if spike.time < 0:
             raise RuntimeError("Spikes cannot be scheduled in the past.")
+        self._inp_queue.append(
+            neuro.Spike(spike.id, spike.time + self._hw_time, spike.value)
+        )
         if self._inp_type == IoType.DISPATCH:
             spikes_now = []
             while self._inp_queue and self._inp_queue[0].time == self._hw_time:
                 # send these spikes as soon as they arrive to reduce latency
                 spikes_now.append(self._inp_queue.popleft())
             self._hw_tx(spikes_now, runs=0)
+
+    def apply_spikes(self, spikes: list[neuro.Spike]) -> None:
+        [self.apply_spike(spike) for spike in spikes]
 
     def clear(self) -> None:
         self.clear_activity()
@@ -188,7 +193,7 @@ class Processor(neuro.Processor):
         self.clear_activity()
 
     def output_count(self, out_idx: int) -> int:
-        return len(self._out_since_last_run(out_idx))
+        return len(self.output_vector(out_idx))
 
     def output_counts(self) -> list[int]:
         return [
@@ -196,7 +201,7 @@ class Processor(neuro.Processor):
         ]
 
     def output_last_fire(self, out_idx: int) -> float:
-        outs = self._out_since_last_run(out_idx)
+        outs = self.output_vector(out_idx)
         return outs[-1] if outs else -1
 
     def output_last_fires(self) -> list[float]:
@@ -206,11 +211,14 @@ class Processor(neuro.Processor):
         ]
 
     def output_vector(self, out_idx: int) -> list[float]:
-        return self._out_queue[out_idx]
+        return [
+            t - self._last_run for t in self._out_queue[out_idx] if t >= self._last_run
+        ]
 
     def output_vectors(self) -> list[list[float]]:
         return [
-            self._out_queue[out_idx] for out_idx in range(self._network.num_outputs())
+            self.output_vector(out_idx)
+            for out_idx in range(self._network.num_outputs())
         ]
 
     def run(self, time: int) -> None:
@@ -273,15 +281,9 @@ class Processor(neuro.Processor):
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
 
-        tx_secs = (
-            width_bits_to_bytes(self._spk_fmt.calcsize())
-            * 10
-            / self._interface.baudrate
-        )
-
         def pause(runs: int) -> None:
             self._hw_time += runs
-            sleep(max(self._secs_per_run * runs, 0.0))
+            sleep(self._secs_per_run * runs)
 
         match self._inp_type:
             case IoType.DISPATCH:
@@ -320,9 +322,6 @@ class Processor(neuro.Processor):
                 for _ in range(runs - 1):
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
-
-    def _out_since_last_run(self, out_idx) -> list[float]:
-        return [t for t in self._out_queue[out_idx] if t >= self._last_run]
 
     def _program_target(self) -> None:
         proc = proc_name(self._network)
@@ -392,32 +391,48 @@ class Processor(neuro.Processor):
                 "paramtype": "vlogparam",
             },
         }
+        files.append(
+            {
+                "name": str(
+                    config_path / f"{self._target_name}" / "uart_processor_top.v"
+                ),
+                "file_type": "verilogSource",
+            }
+        )
 
         tool = self._target_config["default_tool"]
         tool_options = self._target_config["tools"]
         if tool == "vivado":
             tool_options["vivado"]["include_dirs"] = [str(rtl_path)]
             tool_options["vivado"]["source_mgmt_mode"] = "All"
-            # tool_options["vivado"]["libs"] = []
-            # tool_options["vivado"]["name"] = ""
-            # tool_options["vivado"]["src_files"] = []
+            files.append(
+                {
+                    "name": str(
+                        config_path
+                        / f"{self._target_name}"
+                        / f"{self._target_name}.xdc"
+                    ),
+                    "file_type": "xdc",
+                }
+            )
+        elif tool == "quartus":
             files.extend(
                 [
                     {
                         "name": str(
                             config_path
                             / f"{self._target_name}"
-                            / "uart_processor_top.v"
+                            / f"{self._target_name}.qsf"
                         ),
-                        "file_type": "verilogSource",
+                        "file_type": "tclSource",
                     },
                     {
                         "name": str(
                             config_path
                             / f"{self._target_name}"
-                            / f"{self._target_name}.xdc"
+                            / f"{self._target_name}.sdc"
                         ),
-                        "file_type": "xdc",
+                        "file_type": "SDC",
                     },
                 ]
             )
@@ -432,7 +447,7 @@ class Processor(neuro.Processor):
 
         # https://github.com/olofk/edalize/issues/428
         backend = get_edatool(self._target_config["default_tool"])(
-            edam=edam, work_root=proj_path, verbose=False
+            edam=edam, work_root=proj_path, verbose=True
         )
 
         proj_path.mkdir(parents=True, exist_ok=True)
@@ -499,9 +514,7 @@ class Processor(neuro.Processor):
             case _:
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
-        self._max_run = (
-            self._target_config["parameters"]["uart"]["buffer_tx"] + SYSTEM_BUFFER
-        ) // max_bytes_per_run
+        self._max_run = SYSTEM_BUFFER // max_bytes_per_run
 
         match self._inp_type:
             case IoType.DISPATCH:
