@@ -9,11 +9,16 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
+`include "macros.svh"
+
 /*
  * AXI4-Stream UART receiver
  */
 module uart_rx #(
-    parameter DATA_WIDTH = 8
+    parameter real CLK_FREQ = 100_000_000.0,
+    parameter integer BAUD_RATE = 115_200,
+    parameter integer DATA_WIDTH = 8,
+    parameter integer MIN_OVERSAMPLE = 16
 ) (
     input  wire                   clk,
     input  wire                   arstn,
@@ -35,88 +40,154 @@ module uart_rx #(
      */
     output wire                   busy,
     output wire                   overrun_error,
-    output wire                   frame_error,
-
-    /*
-     * Configuration
-     */
-    input  wire [15:0]            prescale
+    output wire                   frame_error
 );
-    reg [DATA_WIDTH-1:0] m_axis_tdata_reg = 0;
-    reg m_axis_tvalid_reg = 0;
+    // input metastability synchronization
+    reg rxd_sync;
+    // second half of double-flopping is provided by rxd_samples register
 
-    reg rxd_reg = 1;
-
-    reg busy_reg = 0;
-    reg overrun_error_reg = 0;
-    reg frame_error_reg = 0;
-
-    reg [DATA_WIDTH-1:0] data_reg = 0;
-    reg [18:0] prescale_reg = 0;
-    reg [3:0] bit_cnt = 0;
-
-    assign m_axis_tdata = m_axis_tdata_reg;
-    assign m_axis_tvalid = m_axis_tvalid_reg;
-
-    assign busy = busy_reg;
-    assign overrun_error = overrun_error_reg;
-    assign frame_error = frame_error_reg;
-
-    always @(posedge clk or negedge arstn) begin
+    always @(posedge clk or negedge arstn) begin: set_rxd_sync
         if (arstn == 0) begin
-            m_axis_tdata_reg <= 0;
-            m_axis_tvalid_reg <= 0;
-            rxd_reg <= 1;
-            prescale_reg <= 0;
-            bit_cnt <= 0;
-            busy_reg <= 0;
-            overrun_error_reg <= 0;
-            frame_error_reg <= 0;
+            rxd_sync <= 1;
         end else begin
-            rxd_reg <= rxd;
-            overrun_error_reg <= 0;
-            frame_error_reg <= 0;
+            rxd_sync <= rxd;
+        end
+    end
 
-            if (m_axis_tvalid && m_axis_tready) begin
-                m_axis_tvalid_reg <= 0;
-            end
+    localparam real CLK_PER_BAUD = CLK_FREQ / BAUD_RATE;
+    // HACK: floor division
+    localparam integer CLK_PER_SAMPLE = CLK_PER_BAUD / MIN_OVERSAMPLE - 0.5;
+    localparam integer SAMPLE_PER_BAUD = CLK_PER_BAUD / CLK_PER_SAMPLE;
 
-            if (prescale_reg > 0) begin
-                prescale_reg <= prescale_reg - 1;
-            end else if (bit_cnt > 0) begin
-                if (bit_cnt > DATA_WIDTH+1) begin
-                    if (!rxd_reg) begin
-                        bit_cnt <= bit_cnt - 1;
-                        prescale_reg <= (prescale << 3)-1;
-                    end else begin
-                        bit_cnt <= 0;
-                        prescale_reg <= 0;
-                    end
-                end else if (bit_cnt > 1) begin
-                    bit_cnt <= bit_cnt - 1;
-                    prescale_reg <= (prescale << 3)-1;
-                    data_reg <= {rxd_reg, data_reg[DATA_WIDTH-1:1]};
-                end else if (bit_cnt == 1) begin
-                    bit_cnt <= bit_cnt - 1;
-                    if (rxd_reg) begin
-                        m_axis_tdata_reg <= data_reg;
-                        m_axis_tvalid_reg <= 1;
-                        overrun_error_reg <= m_axis_tvalid_reg;
-                    end else begin
-                        frame_error_reg <= 1;
-                    end
-                end
+    localparam [1:0]
+        IDLE = 2'b00,
+        START = 2'b01,
+        DATA = 2'b10,
+        STOP = 2'b11;
+
+    reg [1:0] state;
+    reg [$clog2(CLK_PER_SAMPLE + 1)-1:0] clk_count;
+    reg [$clog2(SAMPLE_PER_BAUD + 1)-1:0] samples_count;
+    reg [$clog2(DATA_WIDTH + 1)-1:0] bit_count;
+
+    always @(posedge clk or negedge arstn) begin : set_clk_count
+        if (arstn == 0) begin
+            clk_count <= 0;
+        end else begin
+            if ((state != IDLE) && (clk_count < CLK_PER_SAMPLE - 1)) begin
+                clk_count <= clk_count + 1;
             end else begin
-                busy_reg <= 0;
-                if (!rxd_reg) begin
-                    prescale_reg <= (prescale << 2)-2;
-                    bit_cnt <= DATA_WIDTH+2;
-                    data_reg <= 0;
-                    busy_reg <= 1;
-                end
+                clk_count <= 0;
             end
         end
     end
+
+    always @(posedge clk or negedge arstn) begin : set_samples_count
+        if (arstn == 0) begin
+            samples_count <= 0;
+        end else if (clk_count == 0) begin
+            if ((state != IDLE) && (samples_count < SAMPLE_PER_BAUD - 1)) begin
+                samples_count <= samples_count + 1;
+            end else begin
+                samples_count <= 0;
+            end
+        end
+    end
+
+    reg [SAMPLE_PER_BAUD-1:0] rxd_samples;
+
+    always @(posedge clk or negedge arstn) begin : set_rxd_samples
+        if (arstn == 0) begin
+            rxd_samples <= {SAMPLE_PER_BAUD{1'b1}};
+        end else if ((clk_count == 0) && (state != IDLE)) begin
+            rxd_samples <= {rxd_samples[SAMPLE_PER_BAUD-2:0], rxd_sync};
+        end
+    end
+
+    wire sample_vote;
+    integer sum;
+    integer i;
+    always @* begin : calc_sample_vote
+        sum = 0;
+        // we don't use the first or last samples in consensus
+        for (i = 1; i < SAMPLE_PER_BAUD - 1; i = i + 1) begin
+            sum = sum + rxd_samples[i];
+        end
+    end
+    assign sample_vote = sum > ((SAMPLE_PER_BAUD - 2) / 2);
+
+    reg [DATA_WIDTH-1:0] rxd_data, tdata;
+    reg tvalid, overrun_error_reg, frame_error_reg;
+
+    always @(posedge clk or negedge arstn) begin : state_machine
+        if (arstn == 0) begin
+            state <= IDLE;
+            bit_count <= 0;
+            rxd_data <= 0;
+            overrun_error_reg <= 0;
+            frame_error_reg <= 0;
+        end else begin
+            if (m_axis_tready && m_axis_tvalid)
+                tvalid <= 0;
+            case (state)
+                IDLE: begin
+                    bit_count <= 0;
+                    rxd_data <= 0;
+                    overrun_error_reg <= 0;
+                    frame_error_reg <= 0;
+                    if (rxd_sync == 0)
+                        state <= START;
+                end
+                START: begin
+                    if (clk_count == 0) begin
+                        if (samples_count == 0) begin
+                            // if the start bit does not stay low one sample, we kick back to IDLE
+                            if (rxd_sync == 1)
+                                state <= IDLE;
+                        end else if (samples_count == SAMPLE_PER_BAUD - 1) begin
+                            if (sample_vote == 0)
+                                state <= DATA;
+                            else
+                                state <= IDLE;
+                        end
+                    end
+                end
+                DATA: begin
+                    if ((clk_count == 0) && (samples_count == SAMPLE_PER_BAUD - 1)) begin
+                        rxd_data[bit_count] <= sample_vote;
+                        bit_count <= bit_count + 1;
+                        if (bit_count == DATA_WIDTH - 1) begin
+                            state <= STOP;
+                        end
+                    end
+                end
+                STOP: begin
+                    if ((clk_count == 0) && (samples_count == SAMPLE_PER_BAUD - 1)) begin
+                        if (sample_vote == 1) begin
+                            tdata <= rxd_data;
+                            tvalid <= 1;
+                            frame_error_reg <= 0;
+                        end else begin
+                            tvalid <= 0;
+                            frame_error_reg <= 1;
+                        end
+                        overrun_error_reg <= tvalid;
+                        state <= IDLE;
+                    end
+                end
+                default: begin
+                    state <= IDLE;
+                end
+            endcase
+        end
+    end
+
+    assign m_axis_tdata = tdata;
+    assign m_axis_tvalid = tvalid;
+    assign busy = state != IDLE;
+    assign overrun_error = overrun_error_reg;
+    assign frame_error = frame_error_reg;
+
 endmodule
 
 /*
@@ -207,7 +278,9 @@ endmodule
  * AXI4-Stream UART transceiver
  */
 module uart #(
-    parameter DATA_WIDTH = 8
+    parameter real CLK_FREQ = 100_000_000.0,
+    parameter integer BAUD_RATE = 115_200,
+    parameter integer DATA_WIDTH = 8
 ) (
     input  wire                   clk,
     input  wire                   arstn,
@@ -238,13 +311,12 @@ module uart #(
     output wire                   tx_busy,
     output wire                   rx_busy,
     output wire                   rx_overrun_error,
-    output wire                   rx_frame_error,
-
-    /*
-     * Configuration
-     */
-    input  wire [15:0]            prescale
+    output wire                   rx_frame_error
 );
+    localparam integer PRESCALE = CLK_FREQ / (DATA_WIDTH * BAUD_RATE) - 0.5;
+    wire [15:0] prescale;
+    assign prescale = PRESCALE;
+
     uart_tx #(
         .DATA_WIDTH(DATA_WIDTH)
     ) uart_tx_inst (
@@ -263,6 +335,8 @@ module uart #(
     );
 
     uart_rx #(
+        .CLK_FREQ(CLK_FREQ),
+        .BAUD_RATE(BAUD_RATE),
         .DATA_WIDTH(DATA_WIDTH)
     ) uart_rx_inst (
         .clk(clk),
@@ -276,8 +350,6 @@ module uart #(
         // status
         .busy(rx_busy),
         .overrun_error(rx_overrun_error),
-        .frame_error(rx_frame_error),
-        // configuration
-        .prescale(prescale)
+        .frame_error(rx_frame_error)
     );
 endmodule
