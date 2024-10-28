@@ -54,10 +54,10 @@ module uart_rx #(
         end
     end
 
-    localparam real CLK_PER_BAUD = CLK_FREQ / BAUD_RATE;
+    localparam real CLK_PER_BAUD = CLK_FREQ / BAUD_RATE; // 217.01388888888888888888888888889
     // HACK: floor division
-    localparam integer CLK_PER_SAMPLE = CLK_PER_BAUD / MIN_OVERSAMPLE - 0.5;
-    localparam integer SAMPLE_PER_BAUD = CLK_PER_BAUD / CLK_PER_SAMPLE;
+    localparam integer CLK_PER_SAMPLE = CLK_PER_BAUD / MIN_OVERSAMPLE - 0.5; // 13
+    localparam integer SAMPLE_PER_BAUD = CLK_PER_BAUD / CLK_PER_SAMPLE; // 17
 
     localparam [1:0]
         IDLE = 2'b00,
@@ -66,9 +66,9 @@ module uart_rx #(
         STOP = 2'b11;
 
     reg [1:0] state;
-    reg [$clog2(CLK_PER_SAMPLE + 1)-1:0] clk_count;
-    reg [$clog2(SAMPLE_PER_BAUD + 1)-1:0] samples_count;
-    reg [$clog2(DATA_WIDTH + 1)-1:0] bit_count;
+    reg [$clog2(CLK_PER_SAMPLE)-1:0] clk_count;
+    reg [$clog2(SAMPLE_PER_BAUD)-1:0] samples_count;
+    reg [$clog2(DATA_WIDTH)-1:0] bit_count;
 
     always @(posedge clk or negedge arstn) begin : set_clk_count
         if (arstn == 0) begin
@@ -162,8 +162,9 @@ module uart_rx #(
                     end
                 end
                 STOP: begin
-                    if ((clk_count == 0) && (samples_count == SAMPLE_PER_BAUD - 1)) begin
-                        if (sample_vote == 1) begin
+                    // check stop bit is high mid-sampling, then kick back to IDLE
+                    if ((clk_count == 0) && (samples_count == (SAMPLE_PER_BAUD - 1) / 2)) begin
+                        if (rxd_sync == 1) begin
                             tdata <= rxd_data;
                             tvalid <= 1;
                             frame_error_reg <= 0;
@@ -187,6 +188,25 @@ module uart_rx #(
     assign busy = state != IDLE;
     assign overrun_error = overrun_error_reg;
     assign frame_error = frame_error_reg;
+
+    // ila_0 (
+    //     .clk(clk),
+    //     .probe0(rxd),
+    //     .probe1(rxd_sync),
+    //     .probe2(state),
+    //     .probe3(clk_count),
+    //     .probe4(samples_count),
+    //     .probe5(bit_count),
+    //     .probe6(rxd_samples),
+    //     .probe7(sample_vote),
+    //     .probe8(rxd_data),
+    //     .probe9(m_axis_tdata),
+    //     .probe10(m_axis_tvalid),
+    //     .probe11(m_axis_tready),
+    //     .probe12(busy),
+    //     .probe13(overrun_error),
+    //     .probe14(frame_error)
+    // );
 
 endmodule
 
