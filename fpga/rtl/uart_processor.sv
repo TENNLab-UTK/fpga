@@ -34,11 +34,9 @@ module uart_processor #(
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
     logic rx_frame_error, rx_overrun_error;
 
-    localparam int PRESCALE = `floor(CLK_FREQ / real'(UART_WIDTH * BAUD_RATE));
-    logic [15:0] prescale;
-    assign prescale = PRESCALE;
-
     uart #(
+        .CLK_FREQ(CLK_FREQ),
+        .BAUD_RATE(BAUD_RATE),
         .DATA_WIDTH(UART_WIDTH)
     ) uart_inst (
         .clk,
@@ -54,8 +52,7 @@ module uart_processor #(
         .rx_busy,
         .tx_busy,
         .rx_frame_error,
-        .rx_overrun_error,
-        .prescale
+        .rx_overrun_error
     );
 
     always_ff @(posedge clk or negedge arstn) begin : set_rx_erorr
