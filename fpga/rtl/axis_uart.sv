@@ -236,7 +236,7 @@ module uart_tx #(
         for (i = 0; i < DATA_WIDTH + 2; i = i + 1) begin: baud
             assign CLK_TARGETS[i] = (i + 1) * CLK_PER_BAUD;
         end
-    endgenerate;
+    endgenerate
 
     always @(posedge clk or negedge arstn) begin : set_clk_count
         if (arstn == 0) begin
