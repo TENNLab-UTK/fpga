@@ -10,7 +10,8 @@
 
 module uart_top #(
     parameter real CLK_FREQ = 50_000_000,
-    parameter integer BAUD_RATE = 115_200
+    parameter integer BAUD_RATE = 3_000_000,
+    parameter integer BUFFER_DEPTH = 128
 ) (
     input wire CLOCK_50_B5B,
     input wire CPU_RESET_n,
@@ -20,7 +21,8 @@ module uart_top #(
 );
     uart_processor #(
         .CLK_FREQ(CLK_FREQ),
-        .BAUD_RATE(BAUD_RATE)
+        .BAUD_RATE(BAUD_RATE),
+        .BUFFER_DEPTH(BUFFER_DEPTH)
     ) uart_proc (
         .clk(CLOCK_50_B5B),
         .arstn(CPU_RESET_n),

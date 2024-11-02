@@ -14,9 +14,8 @@ import processor_config::*;
 
 module uart_processor #(
     parameter real CLK_FREQ,
-    parameter int BRAM_BITS = 1_843_200,
     parameter int BAUD_RATE = 115_200,
-    parameter int HOST_BUFFER = 4096
+    parameter int BUFFER_DEPTH = 4096
 ) (
     input logic clk,
     input logic arstn,
@@ -28,7 +27,6 @@ module uart_processor #(
 );
     // Do not change unless adding support for UART parameters outside 8N1 (likely never)
     localparam int UART_WIDTH = 8;
-    localparam int UART_PADS = 2;
 
     logic [UART_WIDTH-1:0] rx_axis_tdata, tx_axis_tdata;
     logic rx_axis_tvalid, rx_axis_tready, tx_axis_tvalid, tx_axis_tready;
@@ -79,43 +77,12 @@ module uart_processor #(
         .m_axis_tready(out_axis_tready)
     );
 
-    // we buffer the rx side because there is no way of conveying backpressure to the host
-    // we don't buffer the tx side because the host has a buffer and the UART tx module exerts backpressure
-    // the question becomes how do we size the buffer?
-    // we need to anticipate how many packets we could receive while the processor is transmitting
-    // - for a Dispatch Source
-    //   - take the number of runs supported by the operand width (2 ^ run_width - 1)
-    //   - multiply by the amount of time per run (further below)
-    //   - divide by the time per packet (10 buad/byte * (out_width / 8) / baud_rate)
-    // - for a Stream Source, for a Stream Source, the strategy is to mirror the size of the linux host buffer: 4096 bytes
-    // the worst case run latency is driven by the UART baud rate, the system clock speed, and the sink mechanism
-    // for Dispatch Sink it's the sum of:
-    // - one clock per net_out
-    // - ten baud per byte; max_bytes is (net_out + 1) * (out_width / 8)
-    // for Stream Sink it's again ten baud per byte; max_bytes is (out_width / 8)
-
-    // UART character rate
-    localparam real CHAR_RATE = real'(BAUD_RATE) / real'(UART_WIDTH + UART_PADS);
-    // clock cycle per character actually transmitted
-    localparam real CLK_PER_CHAR = CLK_FREQ / CHAR_RATE;
-
-    localparam int OUT_CHAR_PER_RUN_MAX = (OUT_PER_RUN_MAX * OUT_WIDTH + UART_WIDTH - 1) / UART_WIDTH;
-    localparam int RUN_MAX = `max(RUN_MAX_BASE ** RUN_WIDTH - 1, HOST_BUFFER / OUT_CHAR_PER_RUN_MAX);
-    // maximum "RUN 1 time" for processor
-    localparam int CLK_PER_RUN_MAX = `ceil(CLK_PER_CHAR) * OUT_CHAR_PER_RUN_MAX + OUT_PER_RUN_MAX - 1;
-    // maximum "RUN X time" for processor
-    localparam int CLK_MAX = CLK_PER_RUN_MAX * RUN_MAX;
-
-    localparam int TARGET_BUF_DEPTH = `max(`cdiv(CLK_MAX, `floor(CLK_PER_CHAR)), HOST_BUFFER);
-    localparam int BRAM_DEPTH = `next_pow2(BRAM_BITS >> 1) / UART_WIDTH;
-    localparam int BUF_DEPTH = `min(TARGET_BUF_DEPTH, BRAM_DEPTH);
-
     logic [UART_WIDTH-1:0] buf_axis_tdata;
     logic buf_axis_tvalid, buf_axis_tready;
 
     axis_fifo #(
         .DATA_WIDTH(UART_WIDTH),
-        .DEPTH(BUF_DEPTH),
+        .DEPTH(BUFFER_DEPTH),
         .KEEP_ENABLE(0),
         .LAST_ENABLE(0),
         .USER_ENABLE(0)
