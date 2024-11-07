@@ -294,14 +294,17 @@ class Processor(neuro.Processor):
                 for _ in range(runs // self._max_run):
                     self._hw_write(
                         self._cmd_fmt.pack(
-                            {"opcode": self._Opcode.RUN, "operand": runs}
+                            {"opcode": self._Opcode.RUN, "operand": self._max_run}
                         )[::-1],
                         runs=self._max_run,
                     )
                 if runs % self._max_run:
                     self._hw_write(
                         self._cmd_fmt.pack(
-                            {"opcode": self._Opcode.RUN, "operand": runs}
+                            {
+                                "opcode": self._Opcode.RUN,
+                                "operand": runs % self._max_run,
+                            }
                         )[::-1],
                         runs=(runs % self._max_run),
                     )
