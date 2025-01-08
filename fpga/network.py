@@ -45,6 +45,17 @@ def charge_width(net: neuro.Network) -> int:
     return max(weight_width, scaling_width)
 
 
+def max_period(net: neuro.Network) -> int:
+    assoc_data_keys = net.data_keys()
+
+    if "other" in assoc_data_keys:
+        assoc_data_other = net.get_data("other")
+        if "sim_time" in assoc_data_other:
+            return assoc_data_other["sim_time"] / 2
+    
+    return 25
+
+
 def spike_value_factor(net: neuro.Network) -> float:
     proc_params = proc_params_dict(net)
     svf = float(proc_params["max_weight"])
@@ -84,6 +95,8 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         raise NotImplementedError(
             "Non-discrete network targeting FPGA not yet supported."
         )
+    
+    net_max_period = max_period(net)
 
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
@@ -94,6 +107,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     f.write(f"package network{suffix}_config;\n")
     f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
+    f.write(f"    localparam int NET_MAX_PERIOD = {net_max_period};\n")
     f.write(f"    localparam int NET_NUM_INP = {num_inp};\n")
     f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
     f.write(f"endpackage\n\n")

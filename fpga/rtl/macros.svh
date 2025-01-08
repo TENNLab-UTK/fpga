@@ -21,4 +21,4 @@
 `define signed_repr_min(WIDTH) -(1 << ((WIDTH)-1))
 
 // field polymorphism helper functions
-`define SRC_WIDTH ((OPC_WIDTH) + `max((SPK_WIDTH), (RUN_WIDTH)))
+`define SRC_WIDTH ((OPC_WIDTH) + `max( `max(SPK_WIDTH, RUN_WIDTH), SPK_PRDC_WIDTH ))

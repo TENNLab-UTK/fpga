@@ -27,6 +27,7 @@ from fpga.network import (
     HASH_LEN,
     build_network_sv,
     charge_width,
+    max_period,
     hash_network,
     proc_name,
     spike_value_factor,
@@ -72,6 +73,7 @@ class DispatchOpcode(IntEnum):
     RUN = auto()
     SPK = auto()
     CLR = auto()
+    SPK_PRDC = auto()
 
 
 class StreamOpcode(IntEnum):
@@ -84,11 +86,11 @@ def opcode_width(opcode_type: type) -> int:
 
 
 def dispatch_operand_widths(
-    net_num_inp: int, net_charge_width: int, is_axi: bool = True
+    net_num_inp: int, net_charge_width: int, net_max_period_width: int, is_axi: bool = True
 ) -> tuple[int, int]:
     opc_width = opcode_width(DispatchOpcode)
     idx_width = unsigned_width(net_num_inp - 1)
-    spk_width = idx_width + net_charge_width
+    spk_width = idx_width + net_charge_width + net_max_period_width
     operand_width = (
         width_nearest_byte(opc_width + spk_width) - opc_width if is_axi else spk_width
     )
@@ -467,6 +469,7 @@ class Processor(neuro.Processor):
         self._out_fmt = bs.compile(out_fmt_str, out_names)
 
         net_charge_width = charge_width(self._network)
+        net_max_period_width = unsigned_width(max_period(self._network))
         opc_width = opcode_width(self._Opcode)
 
         spk_names = list()
@@ -476,7 +479,7 @@ class Processor(neuro.Processor):
         match self._inp_type:
             case IoType.DISPATCH:
                 idx_width, operand_width = dispatch_operand_widths(
-                    self._network.num_inputs(), net_charge_width
+                    self._network.num_inputs(), net_charge_width, net_max_period_width
                 )
 
                 cmd_names = spk_names + ["operand"]
@@ -488,6 +491,8 @@ class Processor(neuro.Processor):
                     spk_fmt_str += f"u{idx_width}"
                 spk_names.append("value")
                 spk_fmt_str += f"s{net_charge_width}"
+                spk_names.append("period")
+                spk_fmt_str += f"s{net_max_period_width}"
             case IoType.STREAM:
                 spk_names.extend(range(self._network.num_inputs()))
                 spk_fmt_str += "".join(
