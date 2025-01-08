@@ -1,14 +1,14 @@
 `timescale 1ns/1ps
 
-//import processor_config::*;
+import processor_config::*;
 
 module axis_processor_tb;
 
     // Simulation constants
-    localparam NUM_INP = 8;
+    localparam NUM_INP = 5;
 
     // Simulation signals
-    logic [8-1:0] inp_data [0:NUM_INP-1];
+    logic [INP_WIDTH-1:0] inp_data [0:NUM_INP-1];
     int t = 0;
 
     // Global signals
@@ -18,12 +18,12 @@ module axis_processor_tb;
     // AXIS master signals
     logic m_tvalid;
     logic m_tready;
-    logic [8-1:0] m_tdata;
+    logic [OUT_WIDTH-1:0] m_tdata;
     
     // AXIS slave signals
     logic s_tvalid;
     logic s_tready;
-    logic [8-1:0] s_tdata;
+    logic [INP_WIDTH-1:0] s_tdata;
 
     axis_processor uut (
         .clk(clk),
@@ -41,6 +41,22 @@ module axis_processor_tb;
 
 
         // Fill test input array with input pkts
+        inp_data[0] = 16'b0110000000000000; // CLR
+        inp_data[1] = 16'b1000010001100000; // apply_periodic(ind=0, val=1, period=3)   001001001001001001001001
+        inp_data[2] = 16'b0010000000000001; // RUN 1
+        inp_data[3] = 16'b1001010001000000; // apply_periodic(ind=1, val=1, period=2)   000101010101010101010101
+        inp_data[4] = 16'b0010000000110001; // RUN 49                                   001100011100011100011100
+
+        // inp_data[0] = 16'b0110000000000000; // CLR
+        // inp_data[1] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[2] = 16'b0010000000000001; // RUN 1
+        // inp_data[3] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[4] = 16'b0010000000000001; // RUN 1
+        // inp_data[5] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[6] = 16'b0010000000000001; // RUN 1
+        // inp_data[7] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[8] = 16'b0010000000000101; // RUN 5
+
         // inp_data[0] = 16'b0110000000000000; // CLR
         // inp_data[1] = 16'b0100010000000000; // AS 0 0 1
         // inp_data[2] = 16'b0010000000000011; // RUN 3
@@ -49,14 +65,15 @@ module axis_processor_tb;
         // inp_data[5] = 16'b0100010000000000; // AS 0 0 1
         // inp_data[6] = 16'b0101010000000000; // AS 1 0 1
         // inp_data[7] = 16'b0010000000000011; // RUN 3
-        inp_data[0] = 8'b11000000; // CLR
-        inp_data[1] = 8'b10001000; // AS 0 0 1
-        inp_data[2] = 8'b01000011; // RUN 3
-        inp_data[3] = 8'b10101000; // AS 1 0 1
-        inp_data[4] = 8'b01000011; // RUN 3
-        inp_data[5] = 8'b10001000; // AS 0 0 1
-        inp_data[6] = 8'b10101000; // AS 1 0 1
-        inp_data[7] = 8'b01000011; // RUN 3
+
+        // inp_data[0] = 8'b11000000; // CLR
+        // inp_data[1] = 8'b10001000; // AS 0 0 1
+        // inp_data[2] = 8'b01000011; // RUN 3
+        // inp_data[3] = 8'b10101000; // AS 1 0 1
+        // inp_data[4] = 8'b01000011; // RUN 3
+        // inp_data[5] = 8'b10001000; // AS 0 0 1
+        // inp_data[6] = 8'b10101000; // AS 1 0 1
+        // inp_data[7] = 8'b01000011; // RUN 3
 
         
         m_tready = 0;
