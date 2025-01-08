@@ -64,11 +64,11 @@ module axis_processor_tb;
         s_tdata = 0;
 
         // Wait for reset
-        #35;
+        #350;
 
         // Assign m_tready to high for the whole simulation
         m_tready = 1;
-        #5;
+        #50;
 
         @(posedge clk);
         
@@ -77,6 +77,7 @@ module axis_processor_tb;
 
         // Send all input data to unit under test; for each packet, wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
         foreach (inp_data[i]) begin
+            #1;
             s_tdata = inp_data[i];
             @(posedge clk);
             while(s_tready != 1) begin
@@ -85,6 +86,7 @@ module axis_processor_tb;
         end
         
         // Set valid signal low after all input packets have been processed/sent
+        #1;
         s_tvalid = 0;
     end
 
@@ -99,18 +101,18 @@ module axis_processor_tb;
         end
     end
 
-    // Simulate 100MHz clock
+    // Simulate 10MHz clock
     initial begin: clk_sim
         clk = 0;
-        forever #5 clk = ~clk;
+        forever #50 clk = ~clk;
     end
 
     // Simulate reset signal
     initial begin: rst_sim
         arstn = 1;
-        #7;
+        #70;
         arstn = 0;
-        #18;
+        #180;
         arstn = 1;
     end
 
