@@ -39,27 +39,40 @@ if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
 
 
-# we're hacking Spike to support comparison
-neuro.Spike.__lt__ = lambda self, other: self.time < other.time
-neuro.Spike.__le__ = lambda self, other: self.time <= other.time
-neuro.Spike.__gt__ = lambda self, other: self.time > other.time
-neuro.Spike.__ge__ = lambda self, other: self.time >= other.time
+class Spike():
+    def __init__(self, id: int, time: int, value: int, period : int = 0):
+        self.id = id
+        self.time = time
+        self.value = value
+        self.period = period
+
+    def __lt__(self, other):
+        return self.time < other.time
+
+    def __le__(self, other):
+        return self.time <= other.time
+
+    def __gt__(self, other):
+        return self.time > other.time
+
+    def __ge__(self, other):
+        return self.time >= other.time
 
 
 # can't believe I have to roll my own priority queue in the year 2024
 # and no, queue.PriorityQueue has wasted thread safety
 class _InpQueue(list):
-    def __init__(self, data: Iterable[neuro.Spike]):
+    def __init__(self, data: Iterable[Spike]):
         super().__init__(data)
         heapify(self)
 
-    def append(self, item: neuro.Spike) -> None:
+    def append(self, item: Spike) -> None:
         heappush(self, item)
 
-    def extend(self, iterable: Iterable[neuro.Spike]) -> None:
+    def extend(self, iterable: Iterable[Spike]) -> None:
         [self.append(item) for item in iterable]
 
-    def popleft(self) -> neuro.Spike:
+    def popleft(self) -> Spike:
         return heappop(self)
 
 
@@ -152,7 +165,22 @@ class Processor(neuro.Processor):
         if spike.time < 0:
             raise RuntimeError("Spikes cannot be scheduled in the past.")
         self._inp_queue.append(
-            neuro.Spike(spike.id, spike.time + self._hw_time, spike.value)
+            Spike(spike.id, spike.time + self._hw_time, spike.value)
+        )
+        if self._inp_type == IoType.DISPATCH:
+            spikes_now = []
+            while self._inp_queue and self._inp_queue[0].time == self._hw_time:
+                # send these spikes as soon as they arrive to reduce latency
+                spikes_now.append(self._inp_queue.popleft())
+            self._hw_tx(spikes_now, runs=0)
+
+    def apply_periodic(self, spike: neuro.Spike, period: int) -> None:
+        if spike.time < 0:
+            raise RuntimeError("Periodic spikes cannot be scheduled in the past.")
+        if period < 0:
+            raise RuntimeError("Periodic spikes cannot have negative period values.")
+        self._inp_queue.append(
+            Spike(spike.id, spike.time + self._hw_time, spike.value, period)
         )
         if self._inp_type == IoType.DISPATCH:
             spikes_now = []
@@ -273,29 +301,36 @@ class Processor(neuro.Processor):
                             self._out_queue[out_idx].append(float(self._rx_time))
             self._rx_time += 1
 
-    def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
-        spike_dict = {
-            self._network.get_node(s.id).input_id: int(
-                s.value * spike_value_factor(self._network)
-            )
-            for s in spikes
-        }
-        if any(key < 0 for key in spike_dict.keys()):
-            raise ValueError("Cannot send spikes to non-input node.")
-
+    def _hw_tx(self, spikes: Iterable[Spike], runs: int) -> None:
         def pause(runs: int) -> None:
             self._hw_time += runs
             sleep(self._secs_per_run * runs)
 
         match self._inp_type:
             case IoType.DISPATCH:
+                spike_dict = {
+                    self._network.get_node(s.id).input_id: (
+                        int(s.value * spike_value_factor(self._network)),
+                        s.period
+                    )
+                    for s in spikes
+                }
+                if any(key < 0 for key in spike_dict.keys()):
+                    raise ValueError("Cannot send spikes to non-input node.")
+
                 [
                     self._interface.write(
                         self._spk_fmt.pack(
-                            {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val}
+                            {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0}
                         )[::-1]
                     )
-                    for idx, val in spike_dict.items()
+                    if period == 0 else
+                    self._interface.write(
+                        self._spk_fmt.pack(
+                            {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period}
+                        )[::-1]
+                    )
+                    for idx, (val, period) in spike_dict.items()
                 ]
                 if runs:
                     self._interface.write(
@@ -306,6 +341,15 @@ class Processor(neuro.Processor):
                     pause(runs)
 
             case IoType.STREAM:
+                spike_dict = {
+                    self._network.get_node(s.id).input_id: int(
+                        s.value * spike_value_factor(self._network)
+                    )
+                    for s in spikes
+                }
+                if any(key < 0 for key in spike_dict.keys()):
+                    raise ValueError("Cannot send spikes to non-input node.")
+
                 if not runs:
                     raise RuntimeError(
                         "Cannot send spikes to stream source without running."
@@ -318,7 +362,9 @@ class Processor(neuro.Processor):
 
                 if self._hw_time == 0:
                     spike_dict["opcode"] = self._Opcode.CLR
-                self._interface.write(self._spk_fmt.pack(spike_dict)[::-1])
+                inp_data = self._spk_fmt.pack(spike_dict)[::-1]
+                print(inp_data)
+                self._interface.write(inp_data)
                 pause(1)
 
                 for _ in range(runs - 1):
