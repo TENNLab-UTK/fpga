@@ -94,9 +94,8 @@ module network_source #(
                     net_inp[i] <= 0;
             end
             case (op)
-                CLR: begin
+                CLR:
                     net_arstn <= 0;
-                end
                 SPK: begin
                     net_arstn <= 1;
                     // set inputs on a spike dispatch
