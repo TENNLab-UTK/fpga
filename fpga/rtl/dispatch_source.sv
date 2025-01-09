@@ -87,20 +87,23 @@ module network_source #(
             net_arstn <= 0;
             for (int i = 0; i < NET_NUM_INP; i++)
                 net_inp[i] <= 0;
-        end else if (op == CLR) begin   // Quartus synthesis demands this be a separate conditional block
-            net_arstn <= 0;
-            for (int i = 0; i < NET_NUM_INP; i++)
-                net_inp[i] <= 0;
         end else begin
-            net_arstn <= 1;
-            if (op == SPK) begin
-                // set inputs on a spike dispatch
-                net_inp[inp_idx] <= inp_val;
-            end else if (net_valid) begin
+            if ((net_valid && net_ready) || op == CLR) begin
                 // reset inputs every time network is run
                 for (int i = 0; i < NET_NUM_INP; i++)
                     net_inp[i] <= 0;
             end
+            case (op)
+                CLR:
+                    net_arstn <= 0;
+                SPK: begin
+                    net_arstn <= 1;
+                    // set inputs on a spike dispatch
+                    net_inp[inp_idx] <= inp_val;
+                end
+                default:
+                    net_arstn <= 1;
+            endcase
         end
     end
 
