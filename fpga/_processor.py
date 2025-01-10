@@ -333,19 +333,12 @@ class Processor(neuro.Processor):
                     for idx, (val, period) in spike_dict.items()
                 ]
 
-                for idx, (val, period) in spike_dict.items():
-                    if period == 0:
-                        print(self._spk_fmt.pack({"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0})[::-1].hex())
-                    else:
-                        print(self._spk_fmt.pack({"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period})[::-1].hex())
-
                 if runs:
                     self._interface.write(
                         self._cmd_fmt.pack(
                             {"opcode": self._Opcode.RUN, "operand": runs}
                         )[::-1]
                     )
-                    print(self._cmd_fmt.pack({"opcode": self._Opcode.RUN, "operand": runs})[::-1].hex())
                     pause(runs)
 
             case IoType.STREAM:
@@ -370,9 +363,7 @@ class Processor(neuro.Processor):
 
                 if self._hw_time == 0:
                     spike_dict["opcode"] = self._Opcode.CLR
-                    print(spike_dict)
                     
-                print(self._spk_fmt.pack(spike_dict)[::-1].hex())
                 self._interface.write(self._spk_fmt.pack(spike_dict)[::-1])
                 pause(1)
 
