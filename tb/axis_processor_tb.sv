@@ -5,7 +5,7 @@ import processor_config::*;
 module axis_processor_tb;
 
     // Simulation constants
-    localparam NUM_INP = 5;
+    localparam NUM_INP = 4;
 
     // Simulation signals
     logic [INP_WIDTH-1:0] inp_data [0:NUM_INP-1];
@@ -39,13 +39,11 @@ module axis_processor_tb;
     // Simulate network's input data packets using AXI Stream
     initial begin: axis_inp_sim
 
-
         // Fill test input array with input pkts
-        inp_data[0] = 16'b0110000000000000; // CLR
-        inp_data[1] = 16'b1000010001100000; // apply_periodic(ind=0, val=1, period=3)   001001001001001001001001
-        inp_data[2] = 16'b0010000000000001; // RUN 1
-        inp_data[3] = 16'b1001010001000000; // apply_periodic(ind=1, val=1, period=2)   000101010101010101010101
-        inp_data[4] = 16'b0010000000110001; // RUN 49                                   001100011100011100011100 = 2, 3, 7, 8, 9, 13, 14, 15, 19, 20, 21, 25, 26, 27, 31, 32, 33, 37, 38, 39, 43, 44, 45, 49
+        inp_data[0] = 16'b1000010001100000; // apply_periodic(ind=0, val=1, period=3)   001001001001001001001001
+        inp_data[1] = 16'b0010000000000001; // RUN 1
+        inp_data[2] = 16'b1001010001000000; // apply_periodic(ind=1, val=1, period=2)   000101010101010101010101
+        inp_data[3] = 16'b0010000000110001; // RUN 49                                   001100011100011100011100 = 2, 3, 7, 8, 9, 13, 14, 15, 19, 20, 21, 25, 26, 27, 31, 32, 33, 37, 38, 39, 43, 44, 45, 49
 
         // inp_data[0] = 16'b0110000000000000; // CLR
         // inp_data[1] = 16'b0100010000000000; // AS 0 0 1
