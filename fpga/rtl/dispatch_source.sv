@@ -122,27 +122,35 @@ module network_source #(
             net_arstn <= 0;
             for (int i = 0; i < NET_NUM_INP; i++)
                 net_inp[i] <= 0;
-        end else if (op == CLR) begin   // Quartus synthesis demands this be a separate conditional block
-            net_arstn <= 0;
-            for (int i = 0; i < NET_NUM_INP; i++)
-                net_inp[i] <= 0;
         end else begin
-            net_arstn <= 1;
-            if (net_valid) begin
+            if ((net_valid && net_ready) || op == CLR) begin
                 // reset inputs every time network is run
-                for (int i = 0; i < NET_NUM_INP; i++) begin
-                    if ((op == SPK || op == SPK_PRDC) && inp_idx == i) begin
-                        net_inp[i] <= inp_val;
-                    end else if (prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0 && prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1) begin
-                        net_inp[i] <= prdc_inp[i][(NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1) - 1) -: NET_CHARGE_WIDTH];
-                    end else begin
-                        net_inp[i] <= 0;
+                for (int i = 0; i < NET_NUM_INP; i++)
+                    net_inp[i] <= 0;
+            end
+            case (op)
+                CLR:
+                    net_arstn <= 0;
+                SPK: begin
+                    net_arstn <= 1;
+                    // set inputs on a spike dispatch
+                    net_inp[inp_idx] <= inp_val;
+                end
+                SPK_PRDC: begin
+                    net_arstn <= 1;
+                    net_inp[inp_idx] <= inp_val;
+                end
+                default: begin
+                    net_arstn <= 1;
+                    if (net_valid && net_ready) begin
+                        for (int i = 0; i < NET_NUM_INP; i++) begin
+                            if (prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0 && prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1) begin
+                                net_inp[i] <= prdc_inp[i][(NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1) - 1) -: NET_CHARGE_WIDTH];
+                            end
+                        end
                     end
                 end
-            end else if (op == SPK || op == SPK_PRDC) begin
-                // set inputs on a spike dispatch
-                net_inp[inp_idx] <= inp_val;
-            end
+            endcase
         end
     end
 
