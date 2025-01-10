@@ -180,7 +180,7 @@ class Processor(neuro.Processor):
         self._interface.flush()
         while self._interface.poll(10 / self._interface.baudrate):
             self._interface.read(self._interface.input_waiting())
-        self._last_run = inf
+        self._last_run = 0
         self._hw_time = 0
         self._rx_time = 0
 
@@ -509,7 +509,7 @@ class Processor(neuro.Processor):
                     / self._target_config["parameters"]["clk_freq"]
                 )
             case IoType.STREAM:
-                pass
+                self._secs_per_run += 1 / self._target_config["parameters"]["clk_freq"]
             case _:
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
@@ -523,6 +523,10 @@ class Processor(neuro.Processor):
                     self._max_run,
                 )
             case IoType.STREAM:
-                pass
+                self._secs_per_run += (
+                    width_bits_to_bytes(self._spk_fmt.calcsize())
+                    * 10
+                    / self._interface.baudrate
+                )
             case _:
                 raise ValueError()
