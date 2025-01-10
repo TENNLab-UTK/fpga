@@ -33,6 +33,7 @@ from fpga.network import (
 )
 
 SYSTEM_BUFFER = 4096
+SYSTEM_FRAME_GAP = 1e-6
 
 if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
     raise RuntimeError("Python 3.6 or newer is required.")
@@ -498,35 +499,34 @@ class Processor(neuro.Processor):
         self._spk_fmt = bs.compile(spk_fmt_str, spk_names)
 
     def _set_comm_limits(self):
-        self._secs_per_run = 0.0
+        self._secs_per_run = 1 / self._target_config["parameters"]["clk_freq"]
 
         max_bytes_per_run = width_bits_to_bytes(self._out_fmt.calcsize())
         match self._out_type:
             case IoType.DISPATCH:
                 max_bytes_per_run *= self._network.num_outputs() + 1
-                self._secs_per_run += (
-                    self._network.num_outputs()
-                    / self._target_config["parameters"]["clk_freq"]
-                )
+                # clock per output for accumulation (and the original for processing)
+                self._secs_per_run *= self._network.num_outputs() + 1
             case IoType.STREAM:
-                self._secs_per_run += 1 / self._target_config["parameters"]["clk_freq"]
+                pass
             case _:
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
         self._max_run = SYSTEM_BUFFER // max_bytes_per_run
 
+        max_bytes_per_run = width_bits_to_bytes(self._spk_fmt.calcsize())
         match self._inp_type:
             case IoType.DISPATCH:
+                max_bytes_per_run *= self._network.num_inputs()
                 # limited by both buffer size and command field width
                 self._max_run = min(
                     2 ** (self._cmd_fmt._infos[1].size) - 1,
                     self._max_run,
                 )
             case IoType.STREAM:
-                self._secs_per_run += (
-                    width_bits_to_bytes(self._spk_fmt.calcsize())
-                    * 10
-                    / self._interface.baudrate
-                )
+                pass
             case _:
                 raise ValueError()
+        self._secs_per_run += max_bytes_per_run * (
+            10 / self._interface.baudrate + SYSTEM_FRAME_GAP
+        )

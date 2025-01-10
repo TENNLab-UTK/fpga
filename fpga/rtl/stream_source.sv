@@ -49,7 +49,7 @@ module network_source #(
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;
-    assign rst_p = src_valid && net_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR);
+    assign rst_p = src_valid && src_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR);
 
     always_ff @(negedge clk or negedge arstn) begin : nset_rstn
         if (arstn == 0) begin
