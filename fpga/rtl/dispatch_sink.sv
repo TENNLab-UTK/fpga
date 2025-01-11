@@ -10,12 +10,22 @@
 
 package sink_config;
     import network_config::*;
-    localparam int SNK_WIDTH = $clog2(NET_NUM_OUT + 1);
+
+    typedef enum {
+        RUN,
+        SPK,
+        NUM_OPS   // not a valid opcode, purely for counting
+    } opcode_t;
+    localparam int SNK_OPC_WIDTH = $clog2(NUM_OPS);
+    // important to note that a NET_NUM_OUT of 1 would make the spk width = 0, making out_idx implicit
+    localparam int SNK_SPK_WIDTH = $clog2(NET_NUM_OUT);
 endpackage
 
 import sink_config::*;
 
-module network_sink (
+module network_sink #(
+    parameter int SNK_RUN_WIDTH
+) (
     // global inputs
     input logic clk,
     input logic arstn,
@@ -28,75 +38,64 @@ module network_sink (
     input logic snk_ready,
     output logic snk_valid,
     // sink output
-    output logic [SNK_WIDTH-1:0] snk
+    output logic [`SNK_WIDTH-1:0] snk
 );
+    logic [SNK_RUN_WIDTH-1:0] run_counter, runs;
+
+    always_ff @(posedge clk or negedge arstn) begin: set_run_counter
+        if (arstn == 0) begin
+            run_counter <= 0;
+        end else if (net_valid && net_ready) begin
+            if (|net_out || &run_counter) begin
+                run_counter <= 0;
+            end else begin
+                run_counter <= run_counter + 1;
+            end
+        end
+    end
+
     logic [NET_NUM_OUT-1:0] fires;
 
-    always_ff @(posedge clk or negedge arstn) begin: set_fires
+    always_ff @(posedge clk or negedge arstn) begin: set_fires_runs
         if (arstn == 0) begin
             fires <= 0;
+            runs <= 0;
         end else if (net_valid && net_ready) begin
             fires <= net_out;
+            runs <= run_counter;
         end
     end
 
-    logic [$clog2(NET_NUM_OUT + 2)-1:0] snk_counter, pop_counter;
-    assign snk_valid = (pop_counter == 0) && (snk_counter > 0);
-    assign net_ready = (pop_counter == 0) && (snk_counter == 0);
-
-    logic pop_fire;
-    assign pop_fire = fires[NET_NUM_OUT + 1 - pop_counter];
-
-    always_ff @(posedge clk or negedge arstn) begin: set_pop_counter
-        if (arstn == 0) begin
-            pop_counter <= 0;
-        end else begin
-            if (net_valid && net_ready) begin
-                pop_counter <= NET_NUM_OUT + 1;
-            end else if (pop_counter > 0) begin
-                pop_counter <= pop_counter - 1;
-            end
-        end
-    end
-
-    // the snk_stack is a little bit complicated it holds:
-    // 1. the indices of the net outputs that fired in descending order
-    // 2. the number of net outputs that fired
-    // of these, 2 is always populated
-    logic [SNK_WIDTH-1:0] snk_stack [0:(NET_NUM_OUT)];   // not -1 because of num_out
-
-    always_ff @(posedge clk or negedge arstn) begin: set_snk_stack
-        if (arstn == 0) begin
-            for (int i = 0; i <= NET_NUM_OUT; i++)
-                snk_stack[i] <= 0;
-        end else begin
-            if (net_valid && net_ready) begin
-                for (int i = 0; i <= NET_NUM_OUT; i++)
-                    snk_stack[i] <= 0;
-            end else if (pop_counter > 0) begin
-                if (pop_counter == 1) begin
-                    snk_stack[snk_counter] <= snk_counter;
-                end else if (pop_fire) begin
-                    snk_stack[snk_counter] <= NET_NUM_OUT + 1 - pop_counter;
-                end
-            end
-        end
-    end
+    logic [$clog2(NET_NUM_OUT + 1)-1:0] snk_counter;
+    assign net_ready = snk_counter == 0;
 
     always_ff @(posedge clk or negedge arstn) begin: set_snk_counter
         if (arstn == 0) begin
             snk_counter <= 0;
         end else begin
-            if (pop_counter > 0 && ((pop_counter == 1) || pop_fire)) begin
-                // an entry was pushed onto the snk_stack
-                snk_counter <= snk_counter + 1;
-            end else if (snk_valid && snk_ready) begin
-                // an entry was popped from the snk_stack
-                snk_counter <= snk_counter - 1;
+            if (net_valid && net_ready && (|net_out || &run_counter)) begin
+                snk_counter <= NET_NUM_OUT + (run_counter > 0);
+            end else if (snk_ready) begin
+                if ((snk_counter > 0) && |fires) begin
+                    snk_counter <= snk_counter - 1;
+                end else begin
+                    snk_counter <= 0;
+                end
             end
         end
     end
 
-    assign snk = snk_stack[snk_counter - 1];
-
+    always_comb begin: calc_snk
+        snk[`SNK_WIDTH-1:0] = 0;
+        snk_valid = 0;
+        if (snk_counter == NET_NUM_OUT + 1) begin
+            snk[(`SNK_WIDTH - 1) -: SNK_OPC_WIDTH] = RUN;
+            snk[(`SNK_WIDTH - SNK_OPC_WIDTH - 1) -: SNK_RUN_WIDTH] = runs;
+            snk_valid = 1;
+        end else if (snk_counter > 0) begin
+            snk[(`SNK_WIDTH - 1) -: SNK_OPC_WIDTH] = SPK;
+            snk[(`SNK_WIDTH - SNK_OPC_WIDTH - 1) -: SNK_SPK_WIDTH] = NET_NUM_OUT - snk_counter;
+            snk_valid = fires[NET_NUM_OUT - snk_counter];
+        end
+    end
 endmodule

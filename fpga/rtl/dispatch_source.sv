@@ -20,15 +20,15 @@ package source_config;
         CLR,
         NUM_OPS   // not a valid opcode, purely for counting
     } opcode_t;
-    localparam int OPC_WIDTH = $clog2(NUM_OPS);
+    localparam int SRC_OPC_WIDTH = $clog2(NUM_OPS);
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
-    localparam int SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
+    localparam int SRC_SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
 endpackage
 
 import source_config::*;
 
 module network_source #(
-    parameter int RUN_WIDTH
+    parameter int SRC_RUN_WIDTH
 ) (
     // global inputs
     input logic clk,
@@ -49,12 +49,12 @@ module network_source #(
 
     always_comb begin : calc_op
         if (src_valid && src_ready)
-            op = opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]);
+            op = opcode_t'(src[(`SRC_WIDTH - 1) -: SRC_OPC_WIDTH]);
         else
             op = NOP;
     end
 
-    logic [RUN_WIDTH-1:0] run_counter;
+    logic [SRC_RUN_WIDTH-1:0] run_counter;
     assign src_ready = (run_counter <= 1);
     assign net_valid = (run_counter > 0);
 
@@ -64,7 +64,7 @@ module network_source #(
         end else begin
             if (op == RUN) begin
                 // RUN op with a '0' run value is assumed to be a single cycle
-                run_counter <= `max(src[(`SRC_WIDTH - OPC_WIDTH - 1) -: RUN_WIDTH], 1);
+                run_counter <= `max(src[(`SRC_WIDTH - SRC_OPC_WIDTH - 1) -: SRC_RUN_WIDTH], 1);
             end else if (net_valid && net_ready) begin
                 run_counter <= run_counter - 1;
             end
@@ -73,14 +73,14 @@ module network_source #(
 
     logic [$clog2(NET_NUM_INP + 1) - 1 : 0] inp_idx;
     generate
-        if (SPK_WIDTH == NET_CHARGE_WIDTH)
+        if (SRC_SPK_WIDTH == NET_CHARGE_WIDTH)
             assign inp_idx = 0;
         else
-            assign inp_idx = src[(`SRC_WIDTH - OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
+            assign inp_idx = src[(`SRC_WIDTH - SRC_OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
     endgenerate
 
     logic signed [NET_CHARGE_WIDTH-1:0] inp_val;
-    assign inp_val = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
+    assign inp_val = src[(`SRC_WIDTH - SRC_OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
 
     always_ff @(posedge clk or negedge arstn) begin: set_net_inp
         if (arstn == 0) begin

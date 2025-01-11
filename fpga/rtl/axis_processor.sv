@@ -12,9 +12,10 @@ package processor_config;
     import source_config::*;
     import sink_config::*;
 
-    localparam int RUN_WIDTH = `width_nearest_byte(SPK_WIDTH + OPC_WIDTH) - OPC_WIDTH;
+    localparam int SRC_RUN_WIDTH = `width_nearest_byte(SRC_SPK_WIDTH + SRC_OPC_WIDTH) - SRC_OPC_WIDTH;
     localparam int INP_WIDTH = `SRC_WIDTH;
-    localparam int OUT_WIDTH = `width_nearest_byte(SNK_WIDTH);
+    localparam int SNK_RUN_WIDTH = `width_nearest_byte(SNK_SPK_WIDTH + SNK_OPC_WIDTH) - SNK_OPC_WIDTH;
+    localparam int OUT_WIDTH = `SNK_WIDTH;
 endpackage
 
 import processor_config::*;
@@ -34,7 +35,7 @@ module axis_processor (
     logic [NET_NUM_OUT-1:0] net_out;
 
     network_source #(
-        .RUN_WIDTH(RUN_WIDTH)
+        .SRC_RUN_WIDTH(SRC_RUN_WIDTH)
     ) source (
         .clk,
         .arstn,
@@ -55,9 +56,11 @@ module axis_processor (
         .out(net_out)
     );
 
-    logic [SNK_WIDTH-1:0] snk;
+    logic [`SNK_WIDTH-1:0] snk;
 
-    network_sink sink (
+    network_sink #(
+        .SNK_RUN_WIDTH(SNK_RUN_WIDTH)
+    ) sink (
         .clk,
         .arstn,
         .net_valid,
@@ -70,6 +73,6 @@ module axis_processor (
 
     always_comb begin : calc_m_axis_tdata
         m_axis_tdata[OUT_WIDTH-1:0] = 0;
-        m_axis_tdata[(OUT_WIDTH - 1) -: SNK_WIDTH] = snk;
+        m_axis_tdata[(OUT_WIDTH - 1) -: `SNK_WIDTH] = snk;
     end
 endmodule

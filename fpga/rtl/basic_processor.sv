@@ -12,7 +12,7 @@ package processor_config;
     import source_config::*;
     import sink_config::*;
 
-    parameter int RUN_WIDTH = SPK_WIDTH;
+    parameter int SRC_RUN_WIDTH = SRC_SPK_WIDTH;
     parameter int INSTR_WIDTH = `SRC_WIDTH;
 endpackage
 
@@ -32,7 +32,7 @@ module basic_processor (
     logic net_ready;
 
     network_source #(
-        .RUN_WIDTH
+        .SRC_RUN_WIDTH
     ) source (
         .clk(clk),
         .arstn(arstn),
@@ -49,7 +49,9 @@ module basic_processor (
         .inp(source.net_inp)
     );
 
-    network_sink sink (
+    network_sink sink #(
+        .SNK_RUN_WIDTH(SNK_SPK_WIDTH)
+    ) (
         .clk(clk),
         .arstn(arstn),
         .net_valid,

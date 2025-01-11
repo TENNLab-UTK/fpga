@@ -17,15 +17,15 @@ package source_config;
         NOM = 0,
         CLR
     } opcode_t;
-    localparam int OPC_WIDTH = 1;
+    localparam int SRC_OPC_WIDTH = 1;
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
-    localparam int SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
+    localparam int SRC_SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
 endpackage
 
 import source_config::*;
 
 module network_source #(
-    parameter int RUN_WIDTH // unused
+    parameter int SRC_RUN_WIDTH // unused
 ) (
     // global inputs
     input logic clk,
@@ -49,7 +49,7 @@ module network_source #(
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;
-    assign rst_p = src_valid && net_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR);
+    assign rst_p = src_valid && net_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: SRC_OPC_WIDTH]) == CLR);
 
     always_ff @(negedge clk or negedge arstn) begin : nset_rstn
         if (arstn == 0) begin
@@ -62,7 +62,7 @@ module network_source #(
 
     always_comb begin: calc_net_inp
         for (int i = 0; i < NET_NUM_INP; i++)
-            net_inp[i] = src[(`SRC_WIDTH - OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
+            net_inp[i] = src[(`SRC_WIDTH - SRC_OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
     end
 
 
