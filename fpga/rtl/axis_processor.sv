@@ -18,9 +18,11 @@ package processor_config;
     localparam int OUT_WIDTH = `SNK_WIDTH;
 endpackage
 
+module axis_processor
+import source_config::*;
+import sink_config::*;
 import processor_config::*;
-
-module axis_processor (
+(
     input logic clk,
     input logic arstn,
     input logic [INP_WIDTH-1:0] s_axis_tdata,
@@ -30,7 +32,7 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    logic net_valid, net_ready, net_arstn;
+    logic net_valid, net_ready, net_last, net_arstn;
     logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
     logic [NET_NUM_OUT-1:0] net_out;
 
@@ -44,6 +46,7 @@ module axis_processor (
         .src(s_axis_tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
         .net_ready,
         .net_valid,
+        .net_last,
         .net_arstn,
         .net_inp
     );
@@ -62,8 +65,9 @@ module axis_processor (
         .SNK_RUN_WIDTH(SNK_RUN_WIDTH)
     ) sink (
         .clk,
-        .arstn,
+        .arstn(net_arstn),
         .net_valid,
+        .net_last,
         .net_ready,
         .net_out,
         .snk_ready(m_axis_tready),

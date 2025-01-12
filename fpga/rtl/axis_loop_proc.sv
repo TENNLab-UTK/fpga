@@ -16,9 +16,9 @@ package processor_config;
     localparam int OUT_WIDTH = `width_bytes_to_bits(PROC_WIDTH_BYTES);
 endpackage
 
+module axis_processor
 import processor_config::*;
-
-module axis_processor (
+(
     input logic clk,
     input logic arstn,
     input logic [INP_WIDTH-1:0] s_axis_tdata,

@@ -10,9 +10,9 @@
 
 `include "macros.svh"
 
+module uart_processor
 import processor_config::*;
-
-module uart_processor #(
+#(
     parameter real CLK_FREQ,
     parameter int BAUD_RATE = 115_200
 ) (

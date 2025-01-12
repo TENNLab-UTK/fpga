@@ -19,15 +19,15 @@ package source_config;
         SPK,
         CLR,
         NUM_OPS   // not a valid opcode, purely for counting
-    } opcode_t;
+    } src_opcode_t;
     localparam int SRC_OPC_WIDTH = $clog2(NUM_OPS);
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SRC_SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
 endpackage
 
+module network_source
 import source_config::*;
-
-module network_source #(
+#(
     parameter int SRC_RUN_WIDTH
 ) (
     // global inputs
@@ -41,15 +41,16 @@ module network_source #(
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
+    output logic net_last,
     // network signals
     output logic net_arstn,
     output logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1]
 );
-    opcode_t op;
+    src_opcode_t op;
 
     always_comb begin : calc_op
         if (src_valid && src_ready)
-            op = opcode_t'(src[(`SRC_WIDTH - 1) -: SRC_OPC_WIDTH]);
+            op = src_opcode_t'(src[(`SRC_WIDTH - 1) -: SRC_OPC_WIDTH]);
         else
             op = NOP;
     end
@@ -57,6 +58,7 @@ module network_source #(
     logic [SRC_RUN_WIDTH-1:0] run_counter;
     assign src_ready = (run_counter <= 1);
     assign net_valid = (run_counter > 0);
+    assign net_last = 0; // TODO: implement sync op
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
@@ -106,5 +108,4 @@ module network_source #(
             endcase
         end
     end
-
 endmodule

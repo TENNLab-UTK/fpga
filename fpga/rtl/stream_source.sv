@@ -16,15 +16,15 @@ package source_config;
     typedef enum {
         NOM = 0,
         CLR
-    } opcode_t;
+    } src_opcode_t;
     localparam int SRC_OPC_WIDTH = 1;
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SRC_SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
 endpackage
 
+module network_source
 import source_config::*;
-
-module network_source #(
+#(
     parameter int SRC_RUN_WIDTH // unused
 ) (
     // global inputs
@@ -38,13 +38,13 @@ module network_source #(
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
+    output logic net_last,  // unused
     // network signals
     output logic net_arstn,
     output logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1]
 );
-
-
     assign net_valid = src_valid;
+    assign net_last = 0;
     assign src_ready = net_ready;
 
     // "Now watch this (half-clock) drive!"
@@ -64,6 +64,4 @@ module network_source #(
         for (int i = 0; i < NET_NUM_INP; i++)
             net_inp[i] = src[(`SRC_WIDTH - SRC_OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
     end
-
-
 endmodule

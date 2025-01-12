@@ -16,20 +16,19 @@ package processor_config;
     parameter int INSTR_WIDTH = `SRC_WIDTH;
 endpackage
 
-import processor_config::*;
-
 // This processor is a simple example that may be useful when two conditions are met:
 // 1. The instruction is valid for every clock cycle.
 // 2. The user is ready for output on every clock cycle.
 
-module basic_processor (
+module basic_processor
+import processor_config::*;
+(
     input logic clk,
     input logic arstn,
     input logic [INSTR_WIDTH-1:0] instr,
     output logic [NET_NUM_OUT-1:0] out
 );
-    logic net_valid;
-    logic net_ready;
+    logic net_valid, net_ready, net_last;
 
     network_source #(
         .SRC_RUN_WIDTH
@@ -39,7 +38,8 @@ module basic_processor (
         .src_valid(1),
         .src(instr),
         .net_ready,
-        .net_valid
+        .net_valid,
+        .net_last
     );
 
     network net (
@@ -55,10 +55,10 @@ module basic_processor (
         .clk(clk),
         .arstn(arstn),
         .net_valid,
+        .net_last,
         .net_ready,
         .net_out(net.out),
         .snk_ready(1),
         .snk(out)
     );
-
 endmodule
