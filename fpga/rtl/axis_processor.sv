@@ -19,6 +19,7 @@ package processor_config;
 endpackage
 
 module axis_processor
+import network_config::*;
 import source_config::*;
 import sink_config::*;
 import processor_config::*;

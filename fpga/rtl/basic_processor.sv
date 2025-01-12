@@ -21,6 +21,9 @@ endpackage
 // 2. The user is ready for output on every clock cycle.
 
 module basic_processor
+import network_config::*;
+import source_config::*;
+import sink_config::*;
 import processor_config::*;
 (
     input logic clk,
