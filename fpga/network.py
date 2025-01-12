@@ -98,9 +98,9 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
     f.write(f"endpackage\n\n")
 
-    f.write(f"import network{suffix}_config::*;\n\n")
-
-    f.write(f"module network{suffix} (\n")
+    f.write(f"module network{suffix}\n")
+    f.write(f"import network{suffix}_config::*;\n")
+    f.write(f"(\n")
     f.write(f"    input logic clk,\n")
     f.write(f"    input logic arstn,\n")
     f.write(f"    input logic en,\n")

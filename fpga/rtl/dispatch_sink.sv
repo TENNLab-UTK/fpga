@@ -22,6 +22,7 @@ package sink_config;
 endpackage
 
 module network_sink
+import network_config::*;
 import sink_config::*;
 #(
     parameter int SNK_RUN_WIDTH

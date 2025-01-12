@@ -23,6 +23,7 @@ package source_config;
 endpackage
 
 module network_source
+import network_config::*;
 import source_config::*;
 #(
     parameter int SRC_RUN_WIDTH // unused
