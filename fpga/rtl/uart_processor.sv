@@ -10,9 +10,7 @@
 
 `include "macros.svh"
 
-module uart_processor
-import processor_config::*;
-#(
+module uart_processor #(
     parameter real CLK_FREQ,
     parameter int BAUD_RATE = 115_200
 ) (
@@ -24,6 +22,8 @@ import processor_config::*;
     output logic tx_busy,
     output logic rx_error
 );
+    import processor_config::*;
+
     // Do not change unless adding support for UART parameters outside 8N1 (likely never)
     localparam int UART_WIDTH = 8;
 

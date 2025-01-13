@@ -20,17 +20,14 @@ endpackage
 // 1. The instruction is valid for every clock cycle.
 // 2. The user is ready for output on every clock cycle.
 
-module basic_processor
-import network_config::*;
-import source_config::*;
-import sink_config::*;
-import processor_config::*;
-(
+module basic_processor (
     input logic clk,
     input logic arstn,
-    input logic [INSTR_WIDTH-1:0] instr,
-    output logic [NET_NUM_OUT-1:0] out
+    input logic [processor_config::INSTR_WIDTH-1:0] instr,
+    output logic [network_config::NET_NUM_OUT-1:0] out
 );
+    import network_config::*;
+    import processor_config::*;
     logic net_valid, net_ready, net_last;
 
     network_source #(

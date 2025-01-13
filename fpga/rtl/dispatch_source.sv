@@ -25,10 +25,7 @@ package source_config;
     localparam int SRC_SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
 endpackage
 
-module network_source
-import network_config::*;
-import source_config::*;
-#(
+module network_source #(
     parameter int SRC_RUN_WIDTH
 ) (
     // global inputs
@@ -45,8 +42,10 @@ import source_config::*;
     output logic net_last,
     // network signals
     output logic net_arstn,
-    output logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1]
+    output logic signed [network_config::NET_CHARGE_WIDTH-1:0] net_inp [0:network_config::NET_NUM_INP-1]
 );
+    import network_config::*;
+    import source_config::*;
     src_opcode_t op;
 
     always_comb begin : calc_op

@@ -21,10 +21,7 @@ package sink_config;
     localparam int SNK_SPK_WIDTH = $clog2(NET_NUM_OUT);
 endpackage
 
-module network_sink
-import network_config::*;
-import sink_config::*;
-#(
+module network_sink #(
     parameter int SNK_RUN_WIDTH
 ) (
     // global inputs
@@ -35,13 +32,15 @@ import sink_config::*;
     input logic net_last,
     output logic net_ready,
     // network signals
-    input logic [NET_NUM_OUT-1:0] net_out,
+    input logic [network_config::NET_NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
     output logic snk_valid,
     // sink output
     output logic [`SNK_WIDTH-1:0] snk
 );
+    import network_config::*;
+    import sink_config::*;
     logic [SNK_RUN_WIDTH-1:0] run_counter, runs;
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter

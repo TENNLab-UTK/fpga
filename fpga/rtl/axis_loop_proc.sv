@@ -17,17 +17,18 @@ package processor_config;
 endpackage
 
 module axis_processor
-import processor_config::*;
 (
     input logic clk,
     input logic arstn,
-    input logic [INP_WIDTH-1:0] s_axis_tdata,
+    input logic [processor_config::INP_WIDTH-1:0] s_axis_tdata,
     input logic s_axis_tvalid,
     output logic s_axis_tready,
-    output logic [OUT_WIDTH-1:0] m_axis_tdata,
+    output logic [processor_config::OUT_WIDTH-1:0] m_axis_tdata,
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
+    import processor_config::*;
+
     assign s_axis_tready = m_axis_tready;
     assign m_axis_tvalid = s_axis_tvalid;
     assign m_axis_tdata = s_axis_tdata;

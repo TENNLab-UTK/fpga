@@ -18,21 +18,19 @@ package processor_config;
     localparam int OUT_WIDTH = `SNK_WIDTH;
 endpackage
 
-module axis_processor
-import network_config::*;
-import source_config::*;
-import sink_config::*;
-import processor_config::*;
-(
+module axis_processor (
     input logic clk,
     input logic arstn,
-    input logic [INP_WIDTH-1:0] s_axis_tdata,
+    input logic [processor_config::INP_WIDTH-1:0] s_axis_tdata,
     input logic s_axis_tvalid,
     output logic s_axis_tready,
-    output logic [OUT_WIDTH-1:0] m_axis_tdata,
+    output logic [processor_config::OUT_WIDTH-1:0] m_axis_tdata,
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
+    import network_config::*;
+    import processor_config::*;
+
     logic net_valid, net_ready, net_last, net_arstn;
     logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
     logic [NET_NUM_OUT-1:0] net_out;

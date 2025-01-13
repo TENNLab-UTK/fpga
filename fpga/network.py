@@ -98,15 +98,17 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
     f.write(f"endpackage\n\n")
 
-    f.write(f"module network{suffix}\n")
-    f.write(f"import network{suffix}_config::*;\n")
-    f.write(f"(\n")
+    f.write(f"module network{suffix} (\n")
     f.write(f"    input logic clk,\n")
     f.write(f"    input logic arstn,\n")
     f.write(f"    input logic en,\n")
-    f.write(f"    input logic signed [NET_CHARGE_WIDTH-1:0] inp [0:NET_NUM_INP-1],\n")
-    f.write(f"    output logic [NET_NUM_OUT-1:0] out\n")
+    f.write(
+        f"    input logic signed [network{suffix}_config::NET_CHARGE_WIDTH-1:0]"
+        + f" inp [0:network{suffix}_config::NET_NUM_INP-1],\n"
+    )
+    f.write(f"    output logic [network{suffix}_config::NET_NUM_OUT-1:0] out\n")
     f.write(f");\n")
+    f.write(f"import network{suffix}_config::*;\n\n")
 
     # begin formatting functions
 
