@@ -12,11 +12,9 @@ package processor_config;
     import source_config::*;
     import sink_config::*;
 
-    parameter int RUN_WIDTH = SPK_WIDTH;
+    parameter int SRC_RUN_WIDTH = SRC_SPK_WIDTH;
     parameter int INSTR_WIDTH = `SRC_WIDTH;
 endpackage
-
-import processor_config::*;
 
 // This processor is a simple example that may be useful when two conditions are met:
 // 1. The instruction is valid for every clock cycle.
@@ -25,21 +23,23 @@ import processor_config::*;
 module basic_processor (
     input logic clk,
     input logic arstn,
-    input logic [INSTR_WIDTH-1:0] instr,
-    output logic [NET_NUM_OUT-1:0] out
+    input logic [processor_config::INSTR_WIDTH-1:0] instr,
+    output logic [network_config::NET_NUM_OUT-1:0] out
 );
-    logic net_valid;
-    logic net_ready;
+    import network_config::*;
+    import processor_config::*;
+    logic net_valid, net_ready, net_last;
 
     network_source #(
-        .RUN_WIDTH
+        .SRC_RUN_WIDTH
     ) source (
         .clk(clk),
         .arstn(arstn),
         .src_valid(1),
         .src(instr),
         .net_ready,
-        .net_valid
+        .net_valid,
+        .net_last
     );
 
     network net (
@@ -49,14 +49,16 @@ module basic_processor (
         .inp(source.net_inp)
     );
 
-    network_sink sink (
+    network_sink sink #(
+        .SNK_RUN_WIDTH(SNK_SPK_WIDTH)
+    ) (
         .clk(clk),
         .arstn(arstn),
         .net_valid,
+        .net_last,
         .net_ready,
         .net_out(net.out),
         .snk_ready(1),
         .snk(out)
     );
-
 endmodule

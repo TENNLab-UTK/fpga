@@ -12,32 +12,35 @@
 
 package sink_config;
     import network_config::*;
-    localparam int SNK_WIDTH = NET_NUM_OUT;
+    localparam int SNK_OPC_WIDTH = 0;
+    localparam int SNK_SPK_WIDTH = NET_NUM_OUT;
 endpackage
 
-import sink_config::*;
-
-module network_sink (
+module network_sink #(
+    parameter int SNK_RUN_WIDTH // unused
+) (
     // global inputs
     input logic clk,
     input logic arstn,
     // network handshake signals
     input logic net_valid,
+    input logic net_last,   // unused
     output logic net_ready,
     // network signals
-    input logic [NET_NUM_OUT-1:0] net_out,
+    input logic [network_config::NET_NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
     output logic snk_valid,
     // sink output
-    output logic [SNK_WIDTH-1:0] snk
+    output logic [`SNK_WIDTH-1:0] snk
 );
+    import network_config::*;
+    import sink_config::*;
 
     assign net_ready = snk_ready;   // stream source is ready iff sink is ready
     assign snk_valid = net_valid;   // sink is ready iff stream source is valid
     always_comb begin: calc_snk
-        for (int i = 0; i < SNK_WIDTH; i++)
-            snk[SNK_WIDTH - i - 1] = net_out[i];
+        for (int i = 0; i < `SNK_WIDTH; i++)
+            snk[`SNK_WIDTH - i - 1] = net_out[i];
     end
-
 endmodule
