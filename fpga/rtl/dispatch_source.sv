@@ -18,6 +18,7 @@ package source_config;
         RUN,
         SPK,
         CLR,
+        DEC,
         NUM_OPS   // not a valid opcode, purely for counting
     } opcode_t;
     localparam int OPC_WIDTH = $clog2(NUM_OPS);
@@ -38,6 +39,8 @@ module network_source #(
     output logic src_ready,
     // source input
     input logic [`SRC_WIDTH-1:0] src,
+    // output handshake signal
+    output logic out_ready,
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
@@ -106,5 +109,7 @@ module network_source #(
             endcase
         end
     end
+
+    assign out_ready = (op == DEC);
 
 endmodule

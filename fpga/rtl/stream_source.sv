@@ -15,9 +15,11 @@ package source_config;
 
     typedef enum {
         NOM = 0,
-        CLR
+        CLR,
+        DEC,
+        NUM_OPS   // not a valid opcode, purely for counting
     } opcode_t;
-    localparam int OPC_WIDTH = 1;
+    localparam int OPC_WIDTH = $clog2(NUM_OPS);
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
 endpackage
@@ -35,6 +37,8 @@ module network_source #(
     output logic src_ready,
     // source input
     input logic [`SRC_WIDTH-1:0] src,
+    // output handshake signal
+    output logic out_ready,
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
@@ -46,6 +50,7 @@ module network_source #(
 
     assign net_valid = src_valid;
     assign src_ready = net_ready;
+    assign out_ready = (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == DEC);
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;

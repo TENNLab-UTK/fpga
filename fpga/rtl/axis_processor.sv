@@ -29,7 +29,7 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    logic net_valid, net_ready, net_arstn;
+    logic net_valid, net_ready, net_arstn, out_ready;
     logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
     logic [NET_NUM_OUT-1:0] net_out;
 
@@ -41,6 +41,7 @@ module axis_processor (
         .src_valid(s_axis_tvalid),
         .src_ready(s_axis_tready),
         .src(s_axis_tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
+        .out_ready,
         .net_ready,
         .net_valid,
         .net_arstn,
@@ -63,6 +64,7 @@ module axis_processor (
         .net_valid,
         .net_ready,
         .net_out,
+        .out_ready,
         .snk_ready(m_axis_tready),
         .snk_valid(m_axis_tvalid),
         .snk

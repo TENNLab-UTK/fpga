@@ -24,6 +24,8 @@ module network_sink (
     output logic net_ready,
     // network signals
     input logic [NET_NUM_OUT-1:0] net_out,
+    // output handshake signal (unused in this file)
+    input logic out_ready,
     // sink handshake signals
     input logic snk_ready,
     output logic snk_valid,
