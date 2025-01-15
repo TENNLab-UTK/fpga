@@ -14,12 +14,11 @@ package source_config;
     import network_config::*;
 
     typedef enum {
-        NOM = 0,
-        CLR,
+        CLR = 0,
         DEC,
         NUM_OPS   // not a valid opcode, purely for counting
-    } opcode_t;
-    localparam int OPC_WIDTH = $clog2(NUM_OPS);
+    } flag_t;
+    localparam int OPC_WIDTH = NUM_OPS;
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SPK_WIDTH = NET_NUM_INP * NET_CHARGE_WIDTH;
 endpackage
@@ -43,31 +42,34 @@ module network_source #(
     input logic net_ready,
     output logic net_valid,
     // network signals
-    output logic net_arstn,
+    output logic net_clr,
     output logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1]
 );
 
+    logic has_clr, has_dec, delay;
 
-    assign net_valid = src_valid;
-    assign src_ready = net_ready;
-    assign out_ready = (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == DEC);
+    assign has_clr = src[`SRC_WIDTH - CLR - 1];
+    assign has_dec = src[`SRC_WIDTH - DEC - 1];
 
-    // "Now watch this (half-clock) drive!"
-    logic rst_p, rst_n;
-    assign rst_p = src_valid && net_ready && (opcode_t'(src[(`SRC_WIDTH - 1) -: OPC_WIDTH]) == CLR);
+    assign net_valid = src_valid & ((~has_clr & ~has_dec) | delay);
+    assign src_ready = net_ready & ((~has_clr & ~has_dec) | delay);
+    assign out_ready = src_valid & has_dec & ~delay;
 
-    always_ff @(negedge clk or negedge arstn) begin : nset_rstn
-        if (arstn == 0) begin
-            rst_n <= 0;
-        end else begin
-            rst_n <= rst_p;
-        end
-    end
-    assign net_arstn = (arstn == 0) ? 0 : !(rst_p && !rst_n);
+    assign net_clr = src_valid & net_ready & has_clr & ~delay;
 
     always_comb begin: calc_net_inp
         for (int i = 0; i < NET_NUM_INP; i++)
             net_inp[i] = src[(`SRC_WIDTH - OPC_WIDTH - (i * NET_CHARGE_WIDTH) - 1) -: NET_CHARGE_WIDTH];
+    end
+
+    always_ff @(posedge clk or negedge arstn) begin: set_delay
+        if (arstn == 0) begin
+            delay <= 0;
+        end else if ((has_clr || has_dec) && !delay) begin
+            delay <= 1;
+        end else begin
+            delay <= 0;
+        end
     end
 
 

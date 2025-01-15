@@ -5,7 +5,7 @@ import processor_config::*;
 module axis_processor_tb;
 
     // Simulation constants
-    localparam NUM_INP = 9;
+    localparam NUM_INP = 17;
 
     // Simulation signals
     logic [INP_WIDTH-1:0] inp_data [0:NUM_INP-1];
@@ -39,15 +39,41 @@ module axis_processor_tb;
     // Simulate network's input data packets using AXI Stream
     initial begin: axis_inp_sim
 
-        inp_data[0] = 8'b01100000; // CLR
-        inp_data[1] = 8'b01000100; // AS 0 0 1
-        inp_data[2] = 8'b00100001; // RUN 1
-        inp_data[3] = 8'b01010100; // AS 1 0 1
-        inp_data[4] = 8'b00100001; // RUN 1
-        inp_data[5] = 8'b01000100; // AS 0 0 1
-        inp_data[6] = 8'b01010100; // AS 1 0 1
-        inp_data[7] = 8'b00100101; // RUN 5
-        inp_data[8] = 8'b10000000; // DEC
+        // inp_data[0] = 8'b10010000; // CLR, AS 0 0 1; RUN 1
+        // inp_data[1] = 8'b00000100; // AS 1 0 1; RUN 1
+        // inp_data[2] = 8'b00010100; // AS 0 0 1; AS 1 0 1; RUN 1
+        // inp_data[3] = 8'b00000000; // RUN 1
+        // inp_data[4] = 8'b00000000; // RUN 1
+        // inp_data[5] = 8'b00000000; // RUN 1
+        // inp_data[6] = 8'b00000000; // RUN 1
+        // inp_data[7] = 8'b00000000; // RUN 1
+        // inp_data[8] = 8'b01010000; // DEC; AS 0 0 1; RUN 1
+        // inp_data[9] = 8'b00000100; // AS 1 0 1; RUN 1
+        // inp_data[10] = 8'b00010100; // AS 0 0 1; AS 1 0 1; RUN 1
+        // inp_data[11] = 8'b00000000; // RUN 1
+        // inp_data[12] = 8'b00000000; // RUN 1
+        // inp_data[13] = 8'b00000000; // RUN 1
+        // inp_data[14] = 8'b00000000; // RUN 1
+        // inp_data[15] = 8'b00000000; // RUN 1
+        // inp_data[16] = 8'b01000000; // DEC; RUN 1
+
+       inp_data[0] = 8'b01100000; // CLR
+       inp_data[1] = 8'b01000100; // AS 0 0 1
+       inp_data[2] = 8'b00100001; // RUN 1
+       inp_data[3] = 8'b01010100; // AS 1 0 1
+       inp_data[4] = 8'b00100001; // RUN 1
+       inp_data[5] = 8'b01000100; // AS 0 0 1
+       inp_data[6] = 8'b01010100; // AS 1 0 1
+       inp_data[7] = 8'b00100101; // RUN 5
+       inp_data[8] = 8'b10000000; // DEC
+       inp_data[9] = 8'b01000100; // AS 0 0 1
+       inp_data[10] = 8'b00100001; // RUN 1
+       inp_data[11] = 8'b01010100; // AS 1 0 1
+       inp_data[12] = 8'b00100001; // RUN 1
+       inp_data[13] = 8'b01000100; // AS 0 0 1
+       inp_data[14] = 8'b01010100; // AS 1 0 1
+       inp_data[15] = 8'b00100101; // RUN 5
+       inp_data[16] = 8'b10000000; // DEC
         
         m_tready = 0;
         s_tvalid = 0;
@@ -67,7 +93,7 @@ module axis_processor_tb;
 
         // Send all input data to unit under test; for each packet, wait until a clock rising edge where s_tready is high (indicates successful AXIS handshake)
         foreach (inp_data[i]) begin
-            #1;
+            #10;
             s_tdata = inp_data[i];
             @(posedge clk);
             while(s_tready != 1) begin

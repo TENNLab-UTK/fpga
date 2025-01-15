@@ -8,13 +8,13 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
-package decoder_config;
+package sink_config;
     import network_config::*;
 
     localparam int SNK_WIDTH = NET_NUM_OUT * DECODER_VAL_MAX_WIDTH;
 endpackage
 
-import decoder_config::*;
+import sink_config::*;
 
 module network_sink (
     input logic clk,
@@ -64,7 +64,7 @@ module network_sink (
                 case (DECODER_TYPES[i])
                     RATE:
                         out_data = out_counts[DECODER_STARTING_NEURONS[i]+j];
-                    TLLS:
+                    TTLS: begin
                         if (out_last_fires[DECODER_STARTING_NEURONS[i]+j] == -1) begin
                             out_data = -1;
                         end else if (out_last_fires[DECODER_STARTING_NEURONS[i]+j] < DECODER_TTLS_START_ATS[i]) begin
@@ -72,8 +72,9 @@ module network_sink (
                         end else begin
                             out_data = out_last_fires[DECODER_STARTING_NEURONS[i]+j] - DECODER_TTLS_START_ATS[i];
                         end
+                    end
                     default:
-                        out_data = -1
+                        out_data = -1;
                 endcase
 
                 // Adjust for custom decoder divisor paramter
@@ -118,18 +119,19 @@ module network_sink (
     always_ff @(posedge clk or negedge arstn) begin: set_timestep
         if (arstn == 0 || out_ready) begin
             timestep <= 0;
-        end else if (net_valid) begin
+        end else if (net_valid && net_ready) begin
             timestep <= timestep + 1;
         end
     end
 
     // For each output neuron, keep track of fire count and last fire timestep
     always_ff @(posedge clk or negedge arstn) begin: set_out_data
-        if (arstn == 0) begin
-            for (int i = 0; i < NET_NUM_OUT; i++)
+        if (arstn == 0 || out_ready) begin
+            for (int i = 0; i < NET_NUM_OUT; i++) begin
                 out_counts[i] <= 0;
                 out_last_fires[i] <= -1;
-        end else if (net_valid) begin
+            end
+        end else if (net_valid && net_ready) begin
             for (int i = 0; i < NET_NUM_OUT; i++) begin
                 out_counts[i] <= out_counts[i] + net_out[i];
                 out_last_fires[i] <= net_out[i] ? timestep : out_last_fires[i];
