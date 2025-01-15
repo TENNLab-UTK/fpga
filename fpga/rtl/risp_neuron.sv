@@ -21,6 +21,7 @@ module risp_neuron #(
 ) (
     input logic clk,
     input logic arstn,
+    input logic clr,
     input logic en,
     input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
     output logic fire
@@ -46,7 +47,7 @@ module risp_neuron #(
     end
 
     always_ff @(posedge clk or negedge arstn) begin: set_fuse
-        if (arstn == 0) begin
+        if (arstn == 0 || clr) begin
             fuse <= FUSE_START;
         end else if (en) begin
             if (do_fire) begin
@@ -60,7 +61,7 @@ module risp_neuron #(
     generate
          if (FIRE_LIKE_RAVENS) begin
               always_ff @(posedge clk or negedge arstn) begin: set_fire
-                    if (arstn == 0) begin
+                    if (arstn == 0 || clr) begin
                          fire <= 0;
                     end else if (en) begin
                          fire <= do_fire;

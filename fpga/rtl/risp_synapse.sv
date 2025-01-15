@@ -16,6 +16,7 @@ module risp_synapse #(
 ) (
     input logic clk,
     input logic arstn,
+    input logic clr,
     input logic en,
     input logic inp,
     output logic signed [CHARGE_WIDTH-1:0] out
@@ -32,7 +33,7 @@ module risp_synapse #(
         // starts with 1 so we don't generate a register for 0 delay
         for (i = 1; i < TRUE_DELAY + 1; ++i) begin: delay_chain
             always_ff @(posedge clk or negedge arstn) begin
-                if (arstn == 0) begin
+                if (arstn == 0 || clr) begin
                     fifo[i] <= 0;
                 end else if (en) begin
                     fifo[i] <= fifo[i-1];

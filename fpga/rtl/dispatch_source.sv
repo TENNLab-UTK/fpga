@@ -45,7 +45,7 @@ module network_source #(
     input logic net_ready,
     output logic net_valid,
     // network signals
-    output logic net_arstn,
+    output logic net_clr,
     output logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1]
 );
     opcode_t op;
@@ -87,7 +87,7 @@ module network_source #(
 
     always_ff @(posedge clk or negedge arstn) begin: set_net_inp
         if (arstn == 0) begin
-            net_arstn <= 0;
+            net_clr <= 0;
             for (int i = 0; i < NET_NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
@@ -98,14 +98,14 @@ module network_source #(
             end
             case (op)
                 CLR:
-                    net_arstn <= 0;
+                    net_clr <= 1;
                 SPK: begin
-                    net_arstn <= 1;
+                    net_clr <= 0;
                     // set inputs on a spike dispatch
                     net_inp[inp_idx] <= inp_val;
                 end
                 default:
-                    net_arstn <= 1;
+                    net_clr <= 0;
             endcase
         end
     end

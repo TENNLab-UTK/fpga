@@ -29,7 +29,7 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    logic net_valid, net_ready, net_arstn, out_ready;
+    logic net_valid, net_ready, net_clr, out_ready;
     logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
     logic [NET_NUM_OUT-1:0] net_out;
 
@@ -44,13 +44,14 @@ module axis_processor (
         .out_ready,
         .net_ready,
         .net_valid,
-        .net_arstn,
+        .net_clr,
         .net_inp
     );
 
     network net (
         .clk,
-        .arstn(net_arstn),
+        .arstn,
+        .clr(net_clr),
         .en(net_valid && net_ready),
         .inp(net_inp),
         .out(net_out)
