@@ -45,6 +45,35 @@ def charge_width(net: neuro.Network) -> int:
     return max(weight_width, scaling_width)
 
 
+def max_run_time(net: neuro.Network) -> int:
+    assoc_data_keys = net.data_keys()
+
+    if "other" in assoc_data_keys:
+        assoc_data_other = net.get_data("other")
+        if "sim_time" in assoc_data_other:
+            return assoc_data_other["sim_time"]
+    
+    return 50
+
+
+def decoder_array(net: neuro.Network) -> neuro.DecoderArray:
+    assoc_data_keys = net.data_keys()
+
+    if "decoder_array" in assoc_data_keys:
+        decoder_array_json = net.get_data("decoder_array")
+        return neuro.DecoderArray(decoder_array_json)
+    
+    return None
+
+
+def decoder_max_value_width(dec_arr: neuro.DecoderArray) -> int:
+    dec_arr_json = dec_arr.as_json()
+
+    return max([signed_width(int(dec_arr_json['dmin'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())]
+        + [signed_width(int(dec_arr_json['dmax'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())
+    ])
+
+
 def spike_value_factor(net: neuro.Network) -> float:
     proc_params = proc_params_dict(net)
     svf = float(proc_params["max_weight"])
@@ -74,6 +103,35 @@ def _num_inp_ports(node: neuro.Node) -> int:
 
 
 def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
+
+    def map_decoder_type_enum(dec_type: str) -> str:
+        match dec_type:
+            case "NeuronCoding.RateCode":
+                return "RATE"
+            case "NeuronCoding.TTLS":
+                return "TTLS"
+            case "NeuronCoding.SpikeCount":
+                return "RATE"
+            case "NeuronCoding.Stochastic":
+                return "RATE"
+            case "NeuronCoding.Temporal":
+                return "TTLS"
+            case "NeuronCoding.TTFS":
+                return "TTLS"
+            case _:
+                return "RATE"
+                    
+    def map_binning_style_enum(bin_style: str) -> str:
+        match bin_style:
+            case "OutputBinning.WTA":
+                return "WTA"
+            case "OutputBinning.LTA":
+                return "LTA"
+            case "OutputBinning.None":
+                return "WTA"
+            case _:
+                return "WTA"
+
     proc_params = proc_params_dict(net)
     net_charge_width = charge_width(net)
     if not proc_params["discrete"]:
@@ -93,9 +151,49 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     )
 
     f.write(f"package network{suffix}_config;\n")
+
     f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
     f.write(f"    localparam int NET_NUM_INP = {num_inp};\n")
-    f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
+    f.write(f"    localparam int NET_NUM_OUT = {num_out};\n\n")
+
+    dec_arr = decoder_array(net)
+
+    if dec_arr != None:
+        net_max_run_time = max_run_time(net)
+        dec_arr_json = dec_arr.as_json()
+
+        f.write(f"    typedef enum {{\n")
+        f.write(f"        RATE = 0,\n")
+        f.write(f"        TTLS\n")
+        f.write(f"    }} decoder_t;\n\n")
+        f.write(f"    typedef enum {{\n")
+        f.write(f"        WTA = 0,\n")
+        f.write(f"        LTA\n")
+        f.write(f"    }} decoder_binning_t;\n\n")
+
+        f.write(f"    localparam int MAX_RUN_TIME = {net_max_run_time};\n")
+        f.write(f"    localparam int DECODER_VAL_MAX_WIDTH = {str(decoder_max_value_width(dec_arr))};\n")
+        f.write(f"    localparam int NUM_DECODERS = {dec_arr.num_decoders()};\n")
+        decoder_num_bins_str = ','.join([str(dec_arr.get_decoder(decoder_ind).neurons) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_NUM_BINS [NUM_DECODERS] = {{{decoder_num_bins_str}}};\n")
+        decoder_decoder_types_str = ','.join([map_decoder_type_enum(str(dec_arr.get_decoder(decoder_ind).intrabin)) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam decoder_t DECODER_TYPES [NUM_DECODERS] = {{{decoder_decoder_types_str}}};\n")
+        decoder_starting_neurons_str = ','.join([str(sum([dec_arr.get_decoder(j).bins for j in range(decoder_ind-1)])) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_STARTING_NEURONS [NUM_DECODERS] = {{{decoder_starting_neurons_str}}};\n")
+        # decoder_ttls_start_ats_str = ','.join([str(int(dec_arr.get_decoder(decoder_ind).ttls_start_at)) for decoder_ind in range(dec_arr.num_decoders())])
+        decoder_ttls_start_ats_str = ','.join([str(0) for _ in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_TTLS_START_ATS [NUM_DECODERS] = {{{decoder_ttls_start_ats_str}}};\n")
+        decoder_divisors_str = ','.join([str(int(dec_arr.get_decoder(decoder_ind).actual_divisor)) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_DIVISORS [NUM_DECODERS] = {{{decoder_divisors_str}}};\n")
+        decoder_flips_str = ','.join([str(int(dec_arr.get_decoder(decoder_ind).flip)) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam logic DECODER_FLIPS [NUM_DECODERS] = {{{decoder_flips_str}}};\n")
+        decoder_binning_styles_str = ','.join([map_binning_style_enum(str(dec_arr.get_decoder(decoder_ind).interbin)) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam decoder_binning_t DECODER_BINNING_STYLES [NUM_DECODERS] = {{{decoder_binning_styles_str}}};\n")
+        decoder_min_vals_str = ','.join([str(int(dec_arr_json['dmin'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_MIN_VALS [NUM_DECODERS] = {{{decoder_min_vals_str}}};\n")
+        decoder_max_vals_str = ','.join([str(int(dec_arr_json['dmax'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())])
+        f.write(f"    localparam int DECODER_MAX_VALS [NUM_DECODERS] = {{{decoder_max_vals_str}}};\n")
+
     f.write(f"endpackage\n\n")
 
     f.write(f"import network{suffix}_config::*;\n\n")
@@ -103,6 +201,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     f.write(f"module network{suffix} (\n")
     f.write(f"    input logic clk,\n")
     f.write(f"    input logic arstn,\n")
+    f.write(f"    input logic clr,\n")
     f.write(f"    input logic en,\n")
     f.write(f"    input logic signed [NET_CHARGE_WIDTH-1:0] inp [0:NET_NUM_INP-1],\n")
     f.write(f"    output logic [NET_NUM_OUT-1:0] out\n")
@@ -195,6 +294,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
+        f.write(f"        .clr,\n")
         f.write(f"        .en,\n")
         f.write(f"        .inp(neur_{neur_id(node.id)}_inp),\n")
         f.write(f"        .fire(neur_{neur_id(node.id)}_fire)\n")
@@ -235,6 +335,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
             f.write(f"        .clk,\n")
             f.write(f"        .arstn,\n")
+            f.write(f"        .clr,\n")
             f.write(f"        .en,\n")
             f.write(f"        .inp(neur_{neur_id(inp.pre.id)}_fire),\n")
             f.write(f"        .out(neur_{neur_id(inp.post.id)}_inp[{inp_idx}])\n")

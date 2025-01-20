@@ -27,6 +27,8 @@ from fpga.network import (
     HASH_LEN,
     build_network_sv,
     charge_width,
+    decoder_array,
+    decoder_max_value_width,
     hash_network,
     proc_name,
     spike_value_factor,
@@ -65,6 +67,7 @@ class _InpQueue(list):
 class IoType(Enum):
     DISPATCH = auto()
     STREAM = auto()
+    DECODER = auto()
 
 
 class DispatchOpcode(IntEnum):
@@ -72,11 +75,12 @@ class DispatchOpcode(IntEnum):
     RUN = auto()
     SPK = auto()
     CLR = auto()
+    DEC = auto()
 
 
 class StreamOpcode(IntEnum):
-    NOM = 0
-    CLR = auto()
+    CLR = 0
+    DEC = auto()
 
 
 def opcode_width(opcode_type: type) -> int:
@@ -139,6 +143,8 @@ class Processor(neuro.Processor):
                 self._out_type = IoType.DISPATCH
             case "SO":
                 self._out_type = IoType.STREAM
+            case "VO":
+                self._out_type = IoType.DECODER
             case _:
                 raise ValueError(
                     f"Invalid output type: {io_type.upper()[2:]}O\nExpected: (D|S)O"
@@ -165,18 +171,22 @@ class Processor(neuro.Processor):
     def clear(self) -> None:
         self.clear_activity()
         self._network = None
+        self.dec_arr = None
 
     def clear_activity(self) -> None:
         self._inp_queue = _InpQueue([])
         self._out_queue = dict()
         if hasattr(self, "_network") and self._network is not None:
-            self._out_queue.update(
-                {out_idx: [] for out_idx in range(self._network.num_outputs())}
-            )
+            if self._out_type is not IoType.DECODER:
+                self._out_queue.update(
+                    {out_idx: [] for out_idx in range(self._network.num_outputs())}
+                )
+
             if self._inp_type == IoType.DISPATCH:
                 self._interface.write(
                     self._cmd_fmt.pack({"opcode": self._Opcode.CLR, "operand": 0})[::-1]
                 )
+            
         self._interface.flush()
         while self._interface.poll(10 / self._interface.baudrate):
             self._interface.read(self._interface.input_waiting())
@@ -187,35 +197,66 @@ class Processor(neuro.Processor):
     def load_network(self, net: neuro.Network) -> None:
         self.clear()
         self._network = net
+        self.dec_arr = self.DecoderArray(self, net)
         self._set_schema()
         self._set_comm_limits()
         self._program_target()
         self.clear_activity()
 
     def output_count(self, out_idx: int) -> int:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_count() is not supported when using either DIVO or SIVO communication."
+            )
+
         return len(self.output_vector(out_idx))
 
     def output_counts(self) -> list[int]:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_counts() is not supported when using either DIVO or SIVO communication."
+            )
+
         return [
             self.output_count(out_idx) for out_idx in range(self._network.num_outputs())
         ]
 
     def output_last_fire(self, out_idx: int) -> float:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_last_fire() is not supported when using either DIVO or SIVO communication."
+            )
+
         outs = self.output_vector(out_idx)
         return outs[-1] if outs else -1
 
     def output_last_fires(self) -> list[float]:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_last_fires() is not supported when using either DIVO or SIVO communication."
+            )
+
         return [
             self.output_last_fire(out_idx)
             for out_idx in range(self._network.num_outputs())
         ]
 
     def output_vector(self, out_idx: int) -> list[float]:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_vector() is not supported when using either DIVO or SIVO communication."
+            )
+
         return [
             t - self._last_run for t in self._out_queue[out_idx] if t >= self._last_run
         ]
 
     def output_vectors(self) -> list[list[float]]:
+        if self._out_type == IoType.DECODER:
+            raise RuntimeError(
+                "output_vectors() is not supported when using either DIVO or SIVO communication."
+            )
+
         return [
             self.output_vector(out_idx)
             for out_idx in range(self._network.num_outputs())
@@ -241,6 +282,10 @@ class Processor(neuro.Processor):
         rx_thread.join()
 
     def _hw_rx(self, runs: int) -> None:
+        if self._out_type == IoType.DECODER:
+            self._rx_time += runs
+            return
+
         num_rx_bytes = width_bits_to_bytes(self._out_fmt.calcsize())
 
         for _ in range(runs):
@@ -269,6 +314,10 @@ class Processor(neuro.Processor):
                     for out_idx, fire in self._out_fmt.unpack(rx).items():
                         if fire:
                             self._out_queue[out_idx].append(float(self._rx_time))
+                
+                case IoType.DECODER:
+                    pass
+
             self._rx_time += 1
 
     def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int) -> None:
@@ -309,17 +358,21 @@ class Processor(neuro.Processor):
                         "Cannot send spikes to stream source without running."
                     )
                 run_dict = {inp_idx: 0 for inp_idx in range(self._network.num_inputs())}
-                run_dict["opcode"] = self._Opcode.NOM
+                run_dict.update({"f" + str(int(x)) : 0 for x in range(len(self._Opcode))})
                 temp = run_dict.copy()
                 temp.update(spike_dict)
                 spike_dict = temp
 
                 if self._hw_time == 0:
-                    spike_dict["opcode"] = self._Opcode.CLR
+                    spike_dict["f"+str(int(self._Opcode.CLR))] = 1
+                else:
+                    spike_dict["f"+str(int(self._Opcode.CLR))] = 0
+                spike_dict["f"+str(int(self._Opcode.DEC))] = 0
                 self._interface.write(self._spk_fmt.pack(spike_dict)[::-1])
                 pause(1)
 
                 for _ in range(runs - 1):
+                    print(run_dict)
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
 
@@ -462,6 +515,14 @@ class Processor(neuro.Processor):
             case IoType.STREAM:
                 out_names = list(range(self._network.num_outputs()))
                 out_fmt_str = "".join("b1" for _ in range(self._network.num_outputs()))
+            case IoType.DECODER:
+                if self.dec_arr == None:
+                    raise RuntimeError(
+                        "DIVO and SIVO communication (decoded output values instead of output spikes) is impossible without a spike decoder array defined in the loaded network."
+                    )
+                net_decoder_max_value_width = decoder_max_value_width(self.dec_arr)
+                out_names = list(range(self.dec_arr.num_decoders()))
+                out_fmt_str = "".join("s" + str(net_decoder_max_value_width) for _ in range(self.dec_arr.num_decoders()))
             case _:
                 raise ValueError()
         self._out_fmt = bs.compile(out_fmt_str, out_names)
@@ -471,10 +532,11 @@ class Processor(neuro.Processor):
 
         spk_names = list()
         spk_fmt_str = ""
-        spk_names.append("opcode")
-        spk_fmt_str += f"u{opc_width}"
         match self._inp_type:
             case IoType.DISPATCH:
+                spk_names.append("opcode")
+                spk_fmt_str += f"u{opc_width}"
+
                 idx_width, operand_width = dispatch_operand_widths(
                     self._network.num_inputs(), net_charge_width
                 )
@@ -489,6 +551,11 @@ class Processor(neuro.Processor):
                 spk_names.append("value")
                 spk_fmt_str += f"s{net_charge_width}"
             case IoType.STREAM:
+                spk_names.extend("f" + str(int(x)) for x in range(len(self._Opcode)))
+                spk_fmt_str += "".join(
+                    "b1" for _ in range(len(self._Opcode))
+                )
+
                 spk_names.extend(range(self._network.num_inputs()))
                 spk_fmt_str += "".join(
                     f"s{net_charge_width}" for _ in range(self._network.num_inputs())
@@ -510,6 +577,8 @@ class Processor(neuro.Processor):
                 )
             case IoType.STREAM:
                 pass
+            case IoType.DECODER:
+                pass
             case _:
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
@@ -526,3 +595,45 @@ class Processor(neuro.Processor):
                 pass
             case _:
                 raise ValueError()
+
+    class DecoderArray(neuro.DecoderArray):
+        def __init__(
+            self,
+            outer_instance,
+            net: neuro.Network,
+        ):
+            super().__init__(decoder_array(net).as_json())
+            self._outer_instance = outer_instance
+
+        @classmethod
+        def _validate(cls, *args, **kwargs):
+            try:
+                assert (len(args) == 2 and decoder_array(args[1]) != None) or (len(kwargs.keys()) >= 1 and 'net' in list(kwargs.keys()) and decoder_array(kwargs['net']) != None)
+            except AssertionError:
+                return False
+            
+            return True
+
+        def __new__(cls, *args, **kwargs):
+            if cls._validate(*args, **kwargs):
+                return super().__new__(cls)
+
+        def get_data_from_processor(self):
+            if self._outer_instance._inp_type == IoType.DISPATCH:
+                self._outer_instance._interface.write(
+                    self._outer_instance._cmd_fmt.pack({"opcode": self._outer_instance._Opcode.DEC, "operand": 0})[::-1]
+                )
+            elif self._outer_instance._inp_type == IoType.STREAM:
+                raise RuntimeError("get_data_from_processor() for SIVO is not yet supported in software.")
+
+            self._outer_instance._interface.flush()
+            num_rx_bytes = width_bits_to_bytes(self._outer_instance._out_fmt.calcsize())
+            sleep(100e-9)
+            rx = self._outer_instance._interface.read(
+                num_rx_bytes,
+                10.0,
+            )[::-1]
+            if len(rx) != num_rx_bytes:
+                raise RuntimeError("Did not receive coherent response from target.")
+
+            return list(self._outer_instance._out_fmt.unpack(rx).values())
