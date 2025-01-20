@@ -34,20 +34,6 @@ module network_sink (
     assign net_ready = snk_ready;
     assign snk_valid = out_ready;
 
-    // TODO: Implement following constants in generated network file:
-    // MAX_RUN_TIME
-    // DECODER_VAL_MAX_WIDTH
-    // NUM_DECODERS
-    // DECODER_NUM_BINS
-    // DECODER_TYPES
-    // DECODER_STARTING_NEURONS
-    // DECODER_TTLS_START_ATS
-    // DECODER_DIVISORS
-    // DECODER_FLIPS
-    // DECODER_BINNING_STYLES
-    // DECODER_MIN_VALS
-    // DECODER_MAX_VALS
-
     // Combinational logic used to decode an output value for each spike encoder
     always_comb begin: decode_values        
         logic signed [$clog2(MAX_RUN_TIME+1)-1:0] out_data;     // Either output neuron spike count or output neuron last fire time (may be adjusted according to divisor, ttls_start_at, flip parameters)
