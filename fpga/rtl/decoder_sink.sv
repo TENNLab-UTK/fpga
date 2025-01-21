@@ -19,6 +19,7 @@ import sink_config::*;
 module network_sink (
     input logic clk,
     input logic arstn,
+    input logic clr,
     input logic net_valid,
     input logic [NET_NUM_OUT-1:0] net_out,
     input logic snk_ready,
@@ -103,7 +104,9 @@ module network_sink (
 
     // Keep track of the number of timesteps since the last spike decoder output
     always_ff @(posedge clk or negedge arstn) begin: set_timestep
-        if (arstn == 0 || out_ready) begin
+        if (arstn == 0) begin
+            timestep <= 0;
+        end else if (out_ready || clr) begin
             timestep <= 0;
         end else if (net_valid && net_ready) begin
             timestep <= timestep + 1;
@@ -112,7 +115,12 @@ module network_sink (
 
     // For each output neuron, keep track of fire count and last fire timestep
     always_ff @(posedge clk or negedge arstn) begin: set_out_data
-        if (arstn == 0 || out_ready) begin
+        if (arstn == 0) begin
+            for (int i = 0; i < NET_NUM_OUT; i++) begin
+                out_counts[i] <= 0;
+                out_last_fires[i] <= -1;
+            end
+        end else if (out_ready || clr) begin
             for (int i = 0; i < NET_NUM_OUT; i++) begin
                 out_counts[i] <= 0;
                 out_last_fires[i] <= -1;

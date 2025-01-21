@@ -21,6 +21,8 @@ module network_sink (
     // global inputs
     input logic clk,
     input logic arstn,
+    // clear signal (unused in this file)
+    input logic clr,
     // network handshake signals
     input logic net_valid,
     output logic net_ready,

@@ -62,6 +62,7 @@ module axis_processor (
     network_sink sink (
         .clk,
         .arstn,
+        .clr(net_clr),
         .net_valid,
         .net_ready,
         .net_out,
