@@ -372,7 +372,6 @@ class Processor(neuro.Processor):
                 pause(1)
 
                 for _ in range(runs - 1):
-                    print(run_dict)
                     self._interface.write(self._spk_fmt.pack(run_dict)[::-1])
                     pause(1)
 
