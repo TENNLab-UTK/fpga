@@ -5,7 +5,7 @@ import processor_config::*;
 module axis_processor_tb;
 
     // Simulation constants
-    localparam NUM_INP = 17;
+    localparam NUM_INP = 9;
 
     // Simulation signals
     logic [INP_WIDTH-1:0] inp_data [0:NUM_INP-1];
@@ -57,23 +57,24 @@ module axis_processor_tb;
         // inp_data[15] = 8'b00000000; // RUN 1
         // inp_data[16] = 8'b01000000; // DEC; RUN 1
 
-       inp_data[0] = 8'b01100000; // CLR
-       inp_data[1] = 8'b01000100; // AS 0 0 1
-       inp_data[2] = 8'b00100001; // RUN 1
-       inp_data[3] = 8'b01010100; // AS 1 0 1
-       inp_data[4] = 8'b00100001; // RUN 1
-       inp_data[5] = 8'b01000100; // AS 0 0 1
-       inp_data[6] = 8'b01010100; // AS 1 0 1
-       inp_data[7] = 8'b00100101; // RUN 5
+       inp_data[0] = 8'b01000100; // AS 0 0 1
+       inp_data[1] = 8'b00100001; // RUN 1
+       inp_data[2] = 8'b01010100; // AS 1 0 1
+       inp_data[3] = 8'b00100001; // RUN 1
+       inp_data[4] = 8'b01000100; // AS 0 0 1
+       inp_data[5] = 8'b01010100; // AS 1 0 1
+       inp_data[6] = 8'b00111111; // RUN 31
+       inp_data[7] = 8'b00110001; // RUN 17
        inp_data[8] = 8'b10000000; // DEC
-       inp_data[9] = 8'b01000100; // AS 0 0 1
-       inp_data[10] = 8'b00100001; // RUN 1
-       inp_data[11] = 8'b01010100; // AS 1 0 1
-       inp_data[12] = 8'b00100001; // RUN 1
-       inp_data[13] = 8'b01000100; // AS 0 0 1
-       inp_data[14] = 8'b01010100; // AS 1 0 1
-       inp_data[15] = 8'b00100101; // RUN 5
-       inp_data[16] = 8'b10000000; // DEC
+//       inp_data[10] = 8'b01000100; // AS 0 0 1
+//       inp_data[11] = 8'b00100001; // RUN 1
+//       inp_data[12] = 8'b01010100; // AS 1 0 1
+//       inp_data[13] = 8'b00100001; // RUN 1
+//       inp_data[14] = 8'b01000100; // AS 0 0 1
+//       inp_data[15] = 8'b01010100; // AS 1 0 1
+//       inp_data[16] = 8'b00011111; // RUN 31
+//       inp_data[17] = 8'b00010001; // RUN 17
+//       inp_data[18] = 8'b10000000; // DEC
         
         m_tready = 0;
         s_tvalid = 0;
@@ -82,7 +83,6 @@ module axis_processor_tb;
         // Wait for reset
         #350;
 
-        // Assign m_tready to high for the whole simulation
         m_tready = 1;
         #50;
 
@@ -95,10 +95,15 @@ module axis_processor_tb;
         foreach (inp_data[i]) begin
             #10;
             s_tdata = inp_data[i];
+            s_tvalid = 1;
             @(posedge clk);
             while(s_tready != 1) begin
                 @(posedge clk);
             end
+            #10
+            s_tvalid = 0;
+            s_tdata = ~0;
+            @(posedge clk);
         end
         
         // Set valid signal low after all input packets have been processed/sent
