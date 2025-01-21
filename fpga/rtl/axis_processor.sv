@@ -12,7 +12,7 @@ package processor_config;
     import source_config::*;
     import sink_config::*;
 
-    localparam int RUN_WIDTH = `width_nearest_byte(SPK_WIDTH + OPC_WIDTH) - OPC_WIDTH;
+    localparam int RUN_WIDTH = `width_nearest_byte(`max(SPK_WIDTH, SPK_PRDC_WIDTH) + OPC_WIDTH) - OPC_WIDTH;
     localparam int INP_WIDTH = `SRC_WIDTH;
     localparam int OUT_WIDTH = `width_nearest_byte(SNK_WIDTH);
 endpackage

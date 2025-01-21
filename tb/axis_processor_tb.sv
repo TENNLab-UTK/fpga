@@ -5,7 +5,7 @@ import processor_config::*;
 module axis_processor_tb;
 
     // Simulation constants
-    localparam NUM_INP = 9;
+    localparam NUM_INP = 4;
 
     // Simulation signals
     logic [INP_WIDTH-1:0] inp_data [0:NUM_INP-1];
@@ -39,42 +39,40 @@ module axis_processor_tb;
     // Simulate network's input data packets using AXI Stream
     initial begin: axis_inp_sim
 
-        // inp_data[0] = 8'b10010000; // CLR, AS 0 0 1; RUN 1
-        // inp_data[1] = 8'b00000100; // AS 1 0 1; RUN 1
-        // inp_data[2] = 8'b00010100; // AS 0 0 1; AS 1 0 1; RUN 1
-        // inp_data[3] = 8'b00000000; // RUN 1
-        // inp_data[4] = 8'b00000000; // RUN 1
-        // inp_data[5] = 8'b00000000; // RUN 1
-        // inp_data[6] = 8'b00000000; // RUN 1
-        // inp_data[7] = 8'b00000000; // RUN 1
-        // inp_data[8] = 8'b01010000; // DEC; AS 0 0 1; RUN 1
-        // inp_data[9] = 8'b00000100; // AS 1 0 1; RUN 1
-        // inp_data[10] = 8'b00010100; // AS 0 0 1; AS 1 0 1; RUN 1
-        // inp_data[11] = 8'b00000000; // RUN 1
-        // inp_data[12] = 8'b00000000; // RUN 1
-        // inp_data[13] = 8'b00000000; // RUN 1
-        // inp_data[14] = 8'b00000000; // RUN 1
-        // inp_data[15] = 8'b00000000; // RUN 1
-        // inp_data[16] = 8'b01000000; // DEC; RUN 1
+        // Fill test input array with input pkts
+        inp_data[0] = 16'b1000010001100000; // apply_periodic(ind=0, val=1, period=3)   001001001001001001001001
+        inp_data[1] = 16'b0010000000000001; // RUN 1
+        inp_data[2] = 16'b1001010001000000; // apply_periodic(ind=1, val=1, period=2)   000101010101010101010101
+        inp_data[3] = 16'b0010000000110001; // RUN 49                                   001100011100011100011100 = 2, 3, 7, 8, 9, 13, 14, 15, 19, 20, 21, 25, 26, 27, 31, 32, 33, 37, 38, 39, 43, 44, 45, 49
 
-       inp_data[0] = 8'b01000100; // AS 0 0 1
-       inp_data[1] = 8'b00100001; // RUN 1
-       inp_data[2] = 8'b01010100; // AS 1 0 1
-       inp_data[3] = 8'b00100001; // RUN 1
-       inp_data[4] = 8'b01000100; // AS 0 0 1
-       inp_data[5] = 8'b01010100; // AS 1 0 1
-       inp_data[6] = 8'b00111111; // RUN 31
-       inp_data[7] = 8'b00110001; // RUN 17
-       inp_data[8] = 8'b10000000; // DEC
-//       inp_data[10] = 8'b01000100; // AS 0 0 1
-//       inp_data[11] = 8'b00100001; // RUN 1
-//       inp_data[12] = 8'b01010100; // AS 1 0 1
-//       inp_data[13] = 8'b00100001; // RUN 1
-//       inp_data[14] = 8'b01000100; // AS 0 0 1
-//       inp_data[15] = 8'b01010100; // AS 1 0 1
-//       inp_data[16] = 8'b00011111; // RUN 31
-//       inp_data[17] = 8'b00010001; // RUN 17
-//       inp_data[18] = 8'b10000000; // DEC
+        // inp_data[0] = 16'b0110000000000000; // CLR
+        // inp_data[1] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[2] = 16'b0010000000000001; // RUN 1
+        // inp_data[3] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[4] = 16'b0010000000000001; // RUN 1
+        // inp_data[5] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[6] = 16'b0010000000000001; // RUN 1
+        // inp_data[7] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[8] = 16'b0010000000000101; // RUN 5
+
+        // inp_data[0] = 16'b0110000000000000; // CLR
+        // inp_data[1] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[2] = 16'b0010000000000011; // RUN 3
+        // inp_data[3] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[4] = 16'b0010000000000011; // RUN 3
+        // inp_data[5] = 16'b0100010000000000; // AS 0 0 1
+        // inp_data[6] = 16'b0101010000000000; // AS 1 0 1
+        // inp_data[7] = 16'b0010000000000011; // RUN 3
+
+        // inp_data[0] = 8'b11000000; // CLR
+        // inp_data[1] = 8'b10001000; // AS 0 0 1
+        // inp_data[2] = 8'b01000011; // RUN 3
+        // inp_data[3] = 8'b10101000; // AS 1 0 1
+        // inp_data[4] = 8'b01000011; // RUN 3
+        // inp_data[5] = 8'b10001000; // AS 0 0 1
+        // inp_data[6] = 8'b10101000; // AS 1 0 1
+        // inp_data[7] = 8'b01000011; // RUN 3
+
         
         m_tready = 0;
         s_tvalid = 0;
