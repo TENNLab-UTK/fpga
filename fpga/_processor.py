@@ -43,7 +43,7 @@ if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
 
 
 class Spike():
-    def __init__(self, id: int, time: int, value: int, period: int = 0, num_periods: int = 0):
+    def __init__(self, id: int, time: int, value: int, period: int = 0, num_periods: int = 1):
         self.id = id
         self.time = time
         self.value = value
@@ -373,16 +373,19 @@ class Processor(neuro.Processor):
                     raise ValueError("Cannot send spikes to non-input node.")
 
                 [
-                    self._interface.write(
-                        self._spk_fmt.pack(
-                            {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0, "num_periods": 0}
-                        )[::-1]
-                    )
-                    if period == 0 or num_periods == 0 else
-                    self._interface.write(
-                        self._spk_fmt.pack(
-                            {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period, "num_periods": num_periods}
-                        )[::-1]
+                    0 if num_periods == 0 or (num_periods > 1 and period == 0) else
+                    (
+                        self._interface.write(
+                            self._spk_fmt.pack(
+                                {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0, "num_periods": 0}
+                            )[::-1]
+                        )
+                        if num_periods == 1 else
+                        self._interface.write(
+                            self._spk_fmt.pack(
+                                {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period, "num_periods": num_periods}
+                            )[::-1]
+                        )
                     )
                     for idx, (val, period, num_periods) in spike_dict.items()
                 ]
