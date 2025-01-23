@@ -25,7 +25,7 @@ package source_config;
     localparam int OPC_WIDTH = $clog2(NUM_OPS);
     // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
     localparam int SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
-    localparam int SPK_PRDC_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1);
+    localparam int SPK_PRDC_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1) + $clog2(NET_MAX_NUM_PERIODS+1);
 endpackage
 
 import source_config::*;
@@ -90,11 +90,17 @@ module network_source #(
     logic signed [$clog2(NET_MAX_PERIOD+1)-1:0] inp_period;
     assign inp_period = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - NET_CHARGE_WIDTH - 1) -: $clog2(NET_MAX_PERIOD+1)];
 
+    logic signed [$clog2(NET_MAX_NUM_PERIODS+1)-1:0] inp_num_periods;
+    assign inp_num_periods = src[(`SRC_WIDTH - OPC_WIDTH - $clog2(NET_NUM_INP) - NET_CHARGE_WIDTH - $clog2(NET_MAX_PERIOD+1) - 1) -: $clog2(NET_MAX_NUM_PERIODS+1)];
+
     // Array used for applying charge periodically to desired inputs; each index corresponds to an input neuron; each value is a bus that holds both the charge to apply and the period to apply it at
     logic [NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1) - 1 : 0] prdc_inp [0:NET_NUM_INP-1];
 
     // Array used for counting timesteps since previous periodic input for each input neuron
     logic [$clog2(NET_MAX_PERIOD)-1:0] prdc_inp_counters [0:NET_NUM_INP-1];
+
+    // Array used for counting number of periods remaining for periodic inputs for each input neuron
+    logic [$clog2(NET_MAX_NUM_PERIODS)-1:0] prdc_inp_num_prds_counters [0:NET_NUM_INP-1]; 
 
     always_ff @(posedge clk or negedge arstn) begin: set_prdc_inp
         if (arstn == 0) begin
@@ -115,6 +121,21 @@ module network_source #(
                     prdc_inp_counters[i] <= 0;
                 end else if (net_valid && net_ready && prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0) begin
                     prdc_inp_counters[i] <= (prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1) ? 0 : prdc_inp_counters[i]+1;
+                end
+            end
+        end
+    end
+
+    always_ff @(posedge clk or negedge arstn) begin: set_prdc_inp_num_prds_counters
+        if (arstn == 0) begin
+            for (int i = 0; i < NET_NUM_INP; i++)
+                prdc_inp_num_prds_counters[i] <= 0;
+        end else begin
+            for (int i = 0; i < NET_NUM_INP; i++) begin
+                if (op == SPK_PRDC && inp_idx == i) begin
+                    prdc_inp_num_prds_counters[i] <= (inp_num_periods == 0) ? 0 : inp_num_periods-1;
+                end else if (net_valid && net_ready && prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0 && prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1 && prdc_inp_num_prds_counters[i] != 0) begin
+                    prdc_inp_num_prds_counters[i] <= prdc_inp_num_prds_counters[i]-1;
                 end
             end
         end
@@ -141,13 +162,14 @@ module network_source #(
                 end
                 SPK_PRDC: begin
                     net_clr <= 0;
-                    net_inp[inp_idx] <= inp_val;
+                    if (inp_num_periods != 0)
+                        net_inp[inp_idx] <= inp_val;
                 end
                 default: begin
                     net_clr <= 0;
                     if (net_valid && net_ready) begin
                         for (int i = 0; i < NET_NUM_INP; i++) begin
-                            if (prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0 && prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1) begin
+                            if (prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)] != 0 && prdc_inp_counters[i] == prdc_inp[i][0 +: $clog2(NET_MAX_PERIOD+1)]-1 && prdc_inp_num_prds_counters[i] != 0) begin
                                 net_inp[i] <= prdc_inp[i][(NET_CHARGE_WIDTH + $clog2(NET_MAX_PERIOD+1) - 1) -: NET_CHARGE_WIDTH];
                             end
                         end

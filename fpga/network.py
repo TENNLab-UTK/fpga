@@ -67,6 +67,17 @@ def max_period(net: neuro.Network) -> int:
     return 25
 
 
+def max_num_periods(net: neuro.Network) -> int:
+    assoc_data_keys = net.data_keys()
+
+    if "other" in assoc_data_keys:
+        assoc_data_other = net.get_data("other")
+        if "sim_time" in assoc_data_other:
+            return assoc_data_other["sim_time"]
+    
+    return 50
+
+
 def decoder_array(net: neuro.Network) -> neuro.DecoderArray:
     assoc_data_keys = net.data_keys()
 
@@ -82,7 +93,7 @@ def decoder_max_value_width(dec_arr: neuro.DecoderArray) -> int:
 
     return max([signed_width(int(dec_arr_json['dmin'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())]
         + [signed_width(int(dec_arr_json['dmax'][decoder_ind])) for decoder_ind in range(dec_arr.num_decoders())
-    ])            
+    ])
 
 
 def spike_value_factor(net: neuro.Network) -> float:
@@ -155,6 +166,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         )
     
     net_max_period = max_period(net)
+    net_max_num_periods = max_num_periods(net)
 
     num_inp = net.num_inputs()
     num_out = net.num_outputs()
@@ -167,6 +179,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
     f.write(f"    localparam int NET_MAX_PERIOD = {net_max_period};\n")
+    f.write(f"    localparam int NET_MAX_NUM_PERIODS = {net_max_num_periods};\n")
     f.write(f"    localparam int NET_NUM_INP = {num_inp};\n")
     f.write(f"    localparam int NET_NUM_OUT = {num_out};\n\n")
 
