@@ -28,6 +28,7 @@ from fpga.network import (
     build_network_sv,
     charge_width,
     max_period,
+    max_num_periods,
     hash_network,
     proc_name,
     spike_value_factor,
@@ -40,11 +41,12 @@ if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
 
 
 class Spike():
-    def __init__(self, id: int, time: int, value: int, period : int = 0):
+    def __init__(self, id: int, time: int, value: int, period: int = 0, num_periods: int = 0):
         self.id = id
         self.time = time
         self.value = value
         self.period = period
+        self.num_periods = num_periods
 
     def __lt__(self, other):
         return self.time < other.time
@@ -99,11 +101,11 @@ def opcode_width(opcode_type: type) -> int:
 
 
 def dispatch_operand_widths(
-    net_num_inp: int, net_charge_width: int, net_max_period_width: int, is_axi: bool = True
+    net_num_inp: int, net_charge_width: int, net_max_period_width: int, net_max_num_periods_width: int, is_axi: bool = True
 ) -> tuple[int, int]:
     opc_width = opcode_width(DispatchOpcode)
     idx_width = unsigned_width(net_num_inp - 1)
-    spk_width = idx_width + net_charge_width + net_max_period_width
+    spk_width = idx_width + net_charge_width + net_max_period_width + net_max_num_periods_width
     operand_width = (
         width_nearest_byte(opc_width + spk_width) - opc_width if is_axi else spk_width
     )
@@ -174,13 +176,15 @@ class Processor(neuro.Processor):
                 spikes_now.append(self._inp_queue.popleft())
             self._hw_tx(spikes_now, runs=0)
 
-    def apply_periodic(self, spike: neuro.Spike, period: int) -> None:
+    def apply_periodic(self, spike: neuro.Spike, period: int, num_periods: int) -> None:
         if spike.time < 0:
             raise RuntimeError("Periodic spikes cannot be scheduled in the past.")
         if period < 0:
             raise RuntimeError("Periodic spikes cannot have negative period values.")
+        if num_periods < 0:
+            raise RuntimeError("Periodic spikes cannot have a negative number of periods.")
         self._inp_queue.append(
-            Spike(spike.id, spike.time + self._hw_time, spike.value, period)
+            Spike(spike.id, spike.time + self._hw_time, spike.value, period, num_periods)
         )
         if self._inp_type == IoType.DISPATCH:
             spikes_now = []
@@ -311,7 +315,8 @@ class Processor(neuro.Processor):
                 spike_dict = {
                     self._network.get_node(s.id).input_id: (
                         int(s.value * spike_value_factor(self._network)),
-                        s.period
+                        s.period,
+                        s.num_periods
                     )
                     for s in spikes
                 }
@@ -319,18 +324,21 @@ class Processor(neuro.Processor):
                     raise ValueError("Cannot send spikes to non-input node.")
 
                 [
-                    self._interface.write(
-                        self._spk_fmt.pack(
-                            {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0}
-                        )[::-1]
+                    0 if num_periods == 0 else
+                    (
+                        self._interface.write(
+                            self._spk_fmt.pack(
+                                {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0, "num_periods": 0}
+                            )[::-1]
+                        )
+                        if period == 0 else
+                        self._interface.write(
+                            self._spk_fmt.pack(
+                                {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period, "num_periods": num_periods}
+                            )[::-1]
+                        )
                     )
-                    if period == 0 else
-                    self._interface.write(
-                        self._spk_fmt.pack(
-                            {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period}
-                        )[::-1]
-                    )
-                    for idx, (val, period) in spike_dict.items()
+                    for idx, (val, period, num_periods) in spike_dict.items()
                 ]
 
                 if runs:
@@ -516,6 +524,7 @@ class Processor(neuro.Processor):
 
         net_charge_width = charge_width(self._network)
         net_max_period_width = unsigned_width(max_period(self._network))
+        net_max_num_periods_width = unsigned_width(max_num_periods(self._network))
         opc_width = opcode_width(self._Opcode)
 
         spk_names = list()
@@ -525,7 +534,7 @@ class Processor(neuro.Processor):
         match self._inp_type:
             case IoType.DISPATCH:
                 idx_width, operand_width = dispatch_operand_widths(
-                    self._network.num_inputs(), net_charge_width, net_max_period_width
+                    self._network.num_inputs(), net_charge_width, net_max_period_width, net_max_num_periods_width
                 )
 
                 cmd_names = spk_names + ["operand"]
@@ -539,6 +548,8 @@ class Processor(neuro.Processor):
                 spk_fmt_str += f"s{net_charge_width}"
                 spk_names.append("period")
                 spk_fmt_str += f"s{net_max_period_width}"
+                spk_names.append("num_periods")
+                spk_fmt_str += f"s{net_max_num_periods_width}"
             case IoType.STREAM:
                 spk_names.extend(range(self._network.num_inputs()))
                 spk_fmt_str += "".join(
