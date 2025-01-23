@@ -324,19 +324,16 @@ class Processor(neuro.Processor):
                     raise ValueError("Cannot send spikes to non-input node.")
 
                 [
-                    0 if num_periods == 0 else
-                    (
-                        self._interface.write(
-                            self._spk_fmt.pack(
-                                {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0, "num_periods": 0}
-                            )[::-1]
-                        )
-                        if period == 0 else
-                        self._interface.write(
-                            self._spk_fmt.pack(
-                                {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period, "num_periods": num_periods}
-                            )[::-1]
-                        )
+                    self._interface.write(
+                        self._spk_fmt.pack(
+                            {"opcode": self._Opcode.SPK, "inp_idx": idx, "value": val, "period": 0, "num_periods": 0}
+                        )[::-1]
+                    )
+                    if period == 0 or num_periods == 0 else
+                    self._interface.write(
+                        self._spk_fmt.pack(
+                            {"opcode": self._Opcode.SPK_PRDC, "inp_idx": idx, "value": val, "period": period, "num_periods": num_periods}
+                        )[::-1]
                     )
                     for idx, (val, period, num_periods) in spike_dict.items()
                 ]
