@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -11,22 +11,16 @@
 `include "macros.svh"
 
 package source_config;
+    export *::*;
     import network_config::*;
-
-    typedef enum {
-        NOP = 0,
-        RUN,
-        SPK,
-        CLR,
-        NUM_OPS   // not a valid opcode, purely for counting
-    } src_opcode_t;
-    localparam int SRC_OPC_WIDTH = $clog2(NUM_OPS);
-    // important to note that a NET_NUM_INP of 1 would make the spk width = charge width
-    localparam int SRC_SPK_WIDTH = $clog2(NET_NUM_INP) + NET_CHARGE_WIDTH;
+    import dispatch_config::*;
+    localparam int PFX_WIDTH = $clog2(NUM_OPC);
+    // important to note that a NUM_INP of 1 would make the spk width = charge width
+    localparam int SPK_WIDTH = $clog2(NUM_INP) + CHARGE_WIDTH;
 endpackage
 
 module network_source #(
-    parameter int SRC_RUN_WIDTH
+    parameter int PKT_WIDTH
 ) (
     // global inputs
     input logic clk,
@@ -35,77 +29,91 @@ module network_source #(
     input logic src_valid,
     output logic src_ready,
     // source input
-    input logic [`SRC_WIDTH-1:0] src,
+    input logic [PKT_WIDTH-1:0] src,
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
     output logic net_last,
     // network signals
     output logic net_arstn,
-    output logic signed [network_config::NET_CHARGE_WIDTH-1:0] net_inp [0:network_config::NET_NUM_INP-1]
+    output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
-    import network_config::*;
     import source_config::*;
-    src_opcode_t op;
+    localparam int RUN_WIDTH = PKT_WIDTH - PFX_WIDTH;
+    opcode_t op;
 
     always_comb begin : calc_op
-        if (src_valid && src_ready)
-            op = src_opcode_t'(src[(`SRC_WIDTH - 1) -: SRC_OPC_WIDTH]);
-        else
-            op = NOP;
+        op = src_opcode_t'(src[(PKT_WIDTH - 1) -: PFX_WIDTH]);
     end
 
-    logic [SRC_RUN_WIDTH-1:0] run_counter;
+    logic [RUN_WIDTH-1:0] run_counter;
     assign src_ready = (run_counter <= 1);
     assign net_valid = (run_counter > 0);
-    assign net_last = 0; // TODO: implement sync op
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
             run_counter <= 0;
         end else begin
-            if (op == RUN) begin
-                // RUN op with a '0' run value is assumed to be a single cycle
-                run_counter <= `max(src[(`SRC_WIDTH - SRC_OPC_WIDTH - 1) -: SRC_RUN_WIDTH], 1);
+            if (src_valid && src_ready && (op == RUN || op == FIN)) begin
+                run_counter <= src[(PKT_WIDTH - PFX_WIDTH - 1) : 0];
             end else if (net_valid && net_ready) begin
                 run_counter <= run_counter - 1;
             end
         end
     end
 
+    logic last;
+    assign net_last = last && run_counter == 1;
+
+    always_ff @(posedge clk or negedge arstn) begin: set_last
+        if (arstn == 0) begin
+            last <= 0;
+        end else if (src_valid && src_ready && op == FIN) begin
+            last <= 1;
+        end else if (net_valid && net_ready && net_last) begin
+            last <= 0;
+        end
+    end
+
+    always_ff @(posedge clk or negedge arstn) begin: set_net_arstn
+        if (arstn == 0) begin
+            net_arstn <= 0;
+        end else if (src_valid && src_ready && op == CLR) begin
+            net_arstn <= 0;
+        end else begin
+            net_arstn <= 1;
+        end
+    end
+
     logic [$clog2(NET_NUM_INP + 1) - 1 : 0] inp_idx;
     generate
-        if (SRC_SPK_WIDTH == NET_CHARGE_WIDTH)
+        if (NUM_INP <= 1)
             assign inp_idx = 0;
         else
-            assign inp_idx = src[(`SRC_WIDTH - SRC_OPC_WIDTH - 1) -: $clog2(NET_NUM_INP)];
+            assign inp_idx = src[(PKT_WIDTH - PFX_WIDTH - 1) -: $clog2(NUM_INP)];
     endgenerate
 
-    logic signed [NET_CHARGE_WIDTH-1:0] inp_val;
-    assign inp_val = src[(`SRC_WIDTH - SRC_OPC_WIDTH - $clog2(NET_NUM_INP) - 1) -: NET_CHARGE_WIDTH];
+    logic signed [CHARGE_WIDTH-1:0] inp_val;
+    assign inp_val = src[(PKT_WIDTH - PFX_WIDTH - $clog2(NUM_INP) - 1) -: CHARGE_WIDTH];
 
     always_ff @(posedge clk or negedge arstn) begin: set_net_inp
         if (arstn == 0) begin
-            net_arstn <= 0;
-            for (int i = 0; i < NET_NUM_INP; i++)
+            for (int i = 0; i < NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
-            if ((net_valid && net_ready) || op == CLR) begin
-                // reset inputs every time network is run
-                for (int i = 0; i < NET_NUM_INP; i++)
+            if (net_valid && net_ready) begin
+                for (int i = 0; i < NUM_INP; i++)
                     net_inp[i] <= 0;
+            end else if (src_valid && src_ready) begin
+                case (op)
+                    SPK:
+                        net_inp[inp_idx] <= inp_val;
+                    CLR: begin
+                        for (int i = 0; i < NUM_INP; i++)
+                            net_inp[i] <= 0;
+                    end
+                endcase
             end
-            case (op)
-                CLR:
-                    net_arstn <= 0;
-                SPK: begin
-                    net_arstn <= 1;
-                    // set inputs on a spike dispatch
-                    net_inp[inp_idx] <= inp_val;
-                end
-                default:
-                    net_arstn <= 1;
-            endcase
         end
     end
 endmodule

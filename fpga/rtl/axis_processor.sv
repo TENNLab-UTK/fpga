@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -9,13 +9,14 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
 package processor_config;
-    import source_config::*;
-    import sink_config::*;
+    export *::*;
+    import network_config::*;
 
-    localparam int SRC_RUN_WIDTH = `width_nearest_byte(SRC_SPK_WIDTH + SRC_OPC_WIDTH) - SRC_OPC_WIDTH;
-    localparam int INP_WIDTH = `SRC_WIDTH;
-    localparam int SNK_RUN_WIDTH = `width_nearest_byte(SNK_SPK_WIDTH + SNK_OPC_WIDTH) - SNK_OPC_WIDTH;
-    localparam int OUT_WIDTH = `SNK_WIDTH;
+    localparam int SRC_PKT_WIDTH = source_config::PFX_WIDTH + source_config::SPK_WIDTH;
+    localparam int INP_WIDTH =`width_nearest_byte(SRC_PKT_WIDTH);
+
+    localparam int SNK_PKT_WIDTH = sink_config::PFX_WIDTH + sink_config::SPK_WIDTH;
+    localparam int OUT_WIDTH = `width_nearest_byte(SNK_PKT_WIDTH);
 endpackage
 
 module axis_processor (
@@ -28,21 +29,20 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
-    import network_config::*;
     import processor_config::*;
 
     logic net_valid, net_ready, net_last, net_arstn;
-    logic signed [NET_CHARGE_WIDTH-1:0] net_inp [0:NET_NUM_INP-1];
-    logic [NET_NUM_OUT-1:0] net_out;
+    logic signed [CHARGE_WIDTH-1:0] net_inp [0:NUM_INP-1];
+    logic [NUM_OUT-1:0] net_out;
 
     network_source #(
-        .SRC_RUN_WIDTH(SRC_RUN_WIDTH)
+        .PKT_WIDTH(SRC_PKT_WIDTH)
     ) source (
         .clk,
         .arstn,
         .src_valid(s_axis_tvalid),
         .src_ready(s_axis_tready),
-        .src(s_axis_tdata[(INP_WIDTH - 1) -: `SRC_WIDTH]),
+        .src(s_axis_tdata[(INP_WIDTH - 1) -: SRC_PKT_WIDTH]),
         .net_ready,
         .net_valid,
         .net_last,
@@ -58,17 +58,18 @@ module axis_processor (
         .out(net_out)
     );
 
-    logic [`SNK_WIDTH-1:0] snk;
+    logic [SNK_PKT_WIDTH-1:0] snk;
 
     network_sink #(
         .SNK_RUN_WIDTH(SNK_RUN_WIDTH)
     ) sink (
         .clk,
-        .arstn(net_arstn),
+        .arstn,
         .net_valid,
         .net_last,
         .net_ready,
         .net_out,
+        .net_arstn,
         .snk_ready(m_axis_tready),
         .snk_valid(m_axis_tvalid),
         .snk
@@ -76,6 +77,6 @@ module axis_processor (
 
     always_comb begin : calc_m_axis_tdata
         m_axis_tdata[OUT_WIDTH-1:0] = 0;
-        m_axis_tdata[(OUT_WIDTH - 1) -: `SNK_WIDTH] = snk;
+        m_axis_tdata[(OUT_WIDTH - 1) -: SNK_PKT_WIDTH] = snk;
     end
 endmodule

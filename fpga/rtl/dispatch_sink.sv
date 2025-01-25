@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -9,20 +9,17 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
 package sink_config;
+    export *::*;
     import network_config::*;
+    import dispatch_config::*;
 
-    typedef enum {
-        RUN = 0,
-        SPK,
-        NUM_OPS   // not a valid opcode, purely for counting
-    } snk_opcode_t;
-    localparam int SNK_OPC_WIDTH = $clog2(NUM_OPS);
+    localparam int PFX_WIDTH = $clog2(NUM_OPC);
     // important to note that a NET_NUM_OUT of 1 would make the spk width = 0, making out_idx implicit
-    localparam int SNK_SPK_WIDTH = $clog2(NET_NUM_OUT);
+    localparam int SPK_WIDTH = $clog2(NUM_OUT);
 endpackage
 
 module network_sink #(
-    parameter int SNK_RUN_WIDTH
+    parameter int PKT_WIDTH
 ) (
     // global inputs
     input logic clk,
@@ -32,22 +29,22 @@ module network_sink #(
     input logic net_last,
     output logic net_ready,
     // network signals
+    input logic net_arstn,
     input logic [network_config::NET_NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
     output logic snk_valid,
     // sink output
-    output logic [`SNK_WIDTH-1:0] snk
+    output logic [PKT_WIDTH-1:0] snk
 );
-    import network_config::*;
     import sink_config::*;
-    logic [SNK_RUN_WIDTH-1:0] run_counter, runs;
+    logic [PKT_WIDTH - PFX_WIDTH - 1:0] run_counter, runs;
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
             run_counter <= 0;
         end else if (net_valid && net_ready) begin
-            if (|net_out || net_last) begin
+            if (|net_out || net_last || (net_arstn == 0)) begin
                 run_counter <= 1;
             end else begin
                 run_counter <= run_counter + 1;
@@ -55,7 +52,7 @@ module network_sink #(
         end
     end
 
-    logic [NET_NUM_OUT-1:0] fires;
+    logic [NUM_OUT-1:0] fires;
 
     always_ff @(posedge clk or negedge arstn) begin: set_fires_runs
         if (arstn == 0) begin
@@ -67,16 +64,15 @@ module network_sink #(
         end
     end
 
-    logic [$clog2(NET_NUM_OUT + 2)-1:0] snk_counter;
+    logic [$clog2(NUM_OUT + 2)-1:0] snk_counter;
     assign net_ready = snk_counter == 0;
 
     always_ff @(posedge clk or negedge arstn) begin: set_snk_counter
         if (arstn == 0) begin
             snk_counter <= 0;
         end else begin
-            if (net_valid && net_ready && (|net_out || net_last || &run_counter)) begin
-                // don't send RUN 0 if we just sent from last overflow, but do on last packet
-                snk_counter <= NET_NUM_OUT + (net_last || run_counter > 0);
+            if (net_valid && net_ready && (|net_out || net_last || (net_arstn == 0) || &run_counter)) begin
+                snk_counter <= NUM_OUT + (run_counter > 0);
             end else if (snk_ready) begin
                 if ((snk_counter > 0) && |fires) begin
                     snk_counter <= snk_counter - 1;
@@ -88,16 +84,16 @@ module network_sink #(
     end
 
     always_comb begin: calc_snk
-        snk[`SNK_WIDTH-1:0] = 0;
+        snk[PKT_WIDTH-1:0] = 0;
         snk_valid = 0;
         if (snk_counter == NET_NUM_OUT + 1) begin
-            snk[(`SNK_WIDTH - 1) -: SNK_OPC_WIDTH] = RUN;
-            snk[(`SNK_WIDTH - SNK_OPC_WIDTH - 1) -: SNK_RUN_WIDTH] = runs;
+            snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = RUN;
+            snk[(PKT_WIDTH - PFX_WIDTH - 1) -: SNK_RUN_WIDTH] = runs;
             snk_valid = 1;
         end else if (snk_counter > 0) begin
-            snk[(`SNK_WIDTH - 1) -: SNK_OPC_WIDTH] = SPK;
-            if (SNK_SPK_WIDTH > 0)
-                snk[(`SNK_WIDTH - SNK_OPC_WIDTH - 1) -: SNK_SPK_WIDTH] = NET_NUM_OUT - snk_counter;
+            snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = SPK;
+            if (SPK_WIDTH > 0)
+                snk[(PKT_WIDTH - PFX_WIDTH - 1) -: SPK_WIDTH] = NET_NUM_OUT - snk_counter;
             snk_valid = fires[NET_NUM_OUT - snk_counter];
         end
     end

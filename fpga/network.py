@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Keegan Dent
+# Copyright (c) 2024-2025 Keegan Dent
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -93,9 +93,9 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     )
 
     f.write(f"package network{suffix}_config;\n")
-    f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
-    f.write(f"    localparam int NET_NUM_INP = {num_inp};\n")
-    f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
+    f.write(f"    localparam int CHARGE_WIDTH = {net_charge_width};\n")
+    f.write(f"    localparam int NUM_INP = {num_inp};\n")
+    f.write(f"    localparam int NUM_OUT = {num_out};\n")
     f.write(f"endpackage\n\n")
 
     f.write(f"module network{suffix} (\n")

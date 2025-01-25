@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -9,11 +9,8 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
 package processor_config;
-    import source_config::*;
-    import sink_config::*;
-
-    parameter int SRC_RUN_WIDTH = SRC_SPK_WIDTH;
-    parameter int INSTR_WIDTH = `SRC_WIDTH;
+    parameter int INP_WIDTH = source_config::PFX_WIDTH + source_config::SPK_WIDTH;
+    parameter int OUT_WIDTH = sink_config::PFX_WIDTH + sink_config::SPK_WIDTH;
 endpackage
 
 // This processor is a simple example that may be useful when two conditions are met:
@@ -23,20 +20,19 @@ endpackage
 module basic_processor (
     input logic clk,
     input logic arstn,
-    input logic [processor_config::INSTR_WIDTH-1:0] instr,
-    output logic [network_config::NET_NUM_OUT-1:0] out
+    input logic [processor_config::INP_WIDTH-1:0] inp,
+    output logic [processor_config::OUT_WIDTH-1:0] out
 );
-    import network_config::*;
     import processor_config::*;
     logic net_valid, net_ready, net_last;
 
     network_source #(
-        .SRC_RUN_WIDTH
+        .PKT_WIDTH(INP_WIDTH)
     ) source (
         .clk(clk),
         .arstn(arstn),
         .src_valid(1),
-        .src(instr),
+        .src(inp),
         .net_ready,
         .net_valid,
         .net_last
@@ -50,13 +46,14 @@ module basic_processor (
     );
 
     network_sink sink #(
-        .SNK_RUN_WIDTH(SNK_SPK_WIDTH)
+        .PKT_WIDTH(OUT_WIDTH)
     ) (
         .clk(clk),
-        .arstn(arstn),
+        .arstn,
         .net_valid,
         .net_last,
         .net_ready,
+        .net_arstn(source.net_arstn),
         .net_out(net.out),
         .snk_ready(1),
         .snk(out)
