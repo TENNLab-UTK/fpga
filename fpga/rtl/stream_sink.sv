@@ -13,6 +13,7 @@
 package sink_config;
     export *::*;
     import network_config::*;
+    import stream_config::*;
     localparam int PFX_WIDTH = NUM_FLG;
     localparam int SPK_WIDTH = NUM_OUT;
 endpackage
@@ -34,8 +35,9 @@ module network_sink #(
     input logic snk_ready,
     output logic snk_valid,
     // sink output
-    output logic [sink_config::PKT_WIDTH-1:0] snk
+    output logic [PKT_WIDTH-1:0] snk
 );
+    import stream_config::*;
     import sink_config::*;
 
     assign net_ready = snk_ready;   // stream source is ready iff sink is ready

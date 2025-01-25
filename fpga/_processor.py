@@ -392,6 +392,7 @@ class Processor(neuro.Processor):
                     "file_type": "systemVerilogSource",
                 }
                 for module in [
+                    "io_configs",
                     f"{self._inp_type.name.lower()}_source",
                     f"{self._out_type.name.lower()}_sink",
                     "axis_processor",

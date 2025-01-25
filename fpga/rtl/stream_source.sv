@@ -28,15 +28,16 @@ module network_source #(
     input logic src_valid,
     output logic src_ready,
     // source input
-    input logic [source_config::PKT_WIDTH-1:0] src,
+    input logic [PKT_WIDTH-1:0] src,
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
     output logic net_last,
     // network signals
     output logic net_arstn,
-    output logic signed [network_config::CHARGE_WIDTH-1:0] inp [0:network_config::NUM_INP-1]
+    output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
+    import stream_config::*;
     import source_config::*;
 
     assign net_valid = src_valid;

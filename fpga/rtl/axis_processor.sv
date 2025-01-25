@@ -9,7 +9,6 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
 package processor_config;
-    export *::*;
     import network_config::*;
 
     localparam int SRC_PKT_WIDTH = source_config::PFX_WIDTH + source_config::SPK_WIDTH;
@@ -29,6 +28,7 @@ module axis_processor (
     output logic m_axis_tvalid,
     input logic m_axis_tready
 );
+    import network_config::*;
     import processor_config::*;
 
     logic net_valid, net_ready, net_last, net_arstn;
@@ -61,7 +61,7 @@ module axis_processor (
     logic [SNK_PKT_WIDTH-1:0] snk;
 
     network_sink #(
-        .SNK_RUN_WIDTH(SNK_RUN_WIDTH)
+        .PKT_WIDTH(SNK_PKT_WIDTH)
     ) sink (
         .clk,
         .arstn,

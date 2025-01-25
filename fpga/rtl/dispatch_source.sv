@@ -15,7 +15,7 @@ package source_config;
     import network_config::*;
     import dispatch_config::*;
     localparam int PFX_WIDTH = $clog2(NUM_OPC);
-    // important to note that a NUM_INP of 1 would make the spk width = charge width
+    // important to note that a NUM_INP of 1 would leave 0 bits for input neuron index
     localparam int SPK_WIDTH = $clog2(NUM_INP) + CHARGE_WIDTH;
 endpackage
 
@@ -38,12 +38,13 @@ module network_source #(
     output logic net_arstn,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
+    import dispatch_config::*;
     import source_config::*;
     localparam int RUN_WIDTH = PKT_WIDTH - PFX_WIDTH;
     opcode_t op;
 
     always_comb begin : calc_op
-        op = src_opcode_t'(src[(PKT_WIDTH - 1) -: PFX_WIDTH]);
+        op = opcode_t'(src[(PKT_WIDTH - 1) -: PFX_WIDTH]);
     end
 
     logic [RUN_WIDTH-1:0] run_counter;
@@ -85,7 +86,7 @@ module network_source #(
         end
     end
 
-    logic [$clog2(NET_NUM_INP + 1) - 1 : 0] inp_idx;
+    logic [$clog2(NUM_INP + 1) - 1 : 0] inp_idx;
     generate
         if (NUM_INP <= 1)
             assign inp_idx = 0;

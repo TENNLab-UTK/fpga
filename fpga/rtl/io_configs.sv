@@ -25,6 +25,7 @@ package dispatch_config;
 endpackage
 
 package procedure_config;
+    export *::*;
     import dispatch_config::opcode_t;
     localparam int NUM_OPC = 8;
 endpackage
