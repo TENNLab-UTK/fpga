@@ -62,11 +62,13 @@ module network_sink #(
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
             run_counter <= 0;
+            runs <= 0;
         end else begin
             if (curr_state == IDLE && next_state == RUNS) begin
                 // it will always have been 1 run since last dispatch set if next net_enable triggers dispatch again
                 // exception is CLR commands which totally reset the counter
                 run_counter <= 1 - rst;
+                runs <= run_counter;
             end else if (net_valid && net_ready) begin
                 run_counter <= run_counter + 1;
             end
@@ -83,6 +85,9 @@ module network_sink #(
         end else if (net_valid && net_ready) begin
             fires <= net_out;
             last <= net_last;
+        end else if (next_state == IDLE) begin
+            fires <= 0;
+            last <= 0;
         end
     end
 
@@ -110,7 +115,8 @@ module network_sink #(
             end
             SPKS: begin
                 snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = SPK;
-                snk[(PKT_WIDTH - PFX_WIDTH - 1) -: SPK_WIDTH] = NUM_OUT - fire_counter;
+                if (SPK_WIDTH > 0)
+                    snk[(PKT_WIDTH - PFX_WIDTH - 1) -: SPK_WIDTH] = NUM_OUT - fire_counter;
                 snk_valid = fires[NUM_OUT - fire_counter];
             end
             CLRD: begin

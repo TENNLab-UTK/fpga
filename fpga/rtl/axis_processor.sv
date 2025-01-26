@@ -11,11 +11,11 @@
 package processor_config;
     import network_config::*;
 
-    localparam int SRC_PKT_WIDTH = source_config::PFX_WIDTH + source_config::SPK_WIDTH;
-    localparam int INP_WIDTH =`width_nearest_byte(SRC_PKT_WIDTH);
+    localparam int SRC_PKT_WIDTH = `width_nearest_byte(source_config::PFX_WIDTH + source_config::SPK_WIDTH);
+    localparam int INP_WIDTH = SRC_PKT_WIDTH;
 
-    localparam int SNK_PKT_WIDTH = sink_config::PFX_WIDTH + sink_config::SPK_WIDTH;
-    localparam int OUT_WIDTH = `width_nearest_byte(SNK_PKT_WIDTH);
+    localparam int SNK_PKT_WIDTH = `width_nearest_byte(sink_config::PFX_WIDTH + sink_config::SPK_WIDTH);
+    localparam int OUT_WIDTH = SNK_PKT_WIDTH;
 endpackage
 
 module axis_processor (
