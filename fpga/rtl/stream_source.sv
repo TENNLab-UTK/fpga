@@ -43,12 +43,12 @@ module network_source #(
     assign net_valid = src_valid;
     assign src_ready = net_ready;
 
-    assign net_last = src[PKT_WIDTH - PFX_WIDTH + FIN];
+    assign net_last = src[PKT_WIDTH - FIN - 1];
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;
     // rst_p asserted for one clock at positive edge when CLR
-    assign rst_p = src_valid && net_ready && src[PKT_WIDTH - PFX_WIDTH + CLR];
+    assign rst_p = src_valid && net_ready && src[PKT_WIDTH - CLR - 1];
 
     // rst_n is rst_p delayed by a half-clock
     always_ff @(negedge clk or negedge arstn) begin : nset_rstn
