@@ -64,10 +64,9 @@ module network_sink #(
             run_counter <= 0;
             runs <= 0;
         end else begin
-            if (curr_state == IDLE && next_state == RUNS) begin
-                // it will always have been 1 run since last dispatch set if next net_enable triggers dispatch again
-                // exception is CLR commands which totally reset the counter
-                run_counter <= 1 - rst;
+            if (curr_state == IDLE && next_state != IDLE) begin
+                // replace run received while sending a dispatch
+                run_counter <= net_valid;
                 runs <= run_counter;
             end else if (net_valid && net_ready) begin
                 run_counter <= run_counter + 1;
