@@ -119,9 +119,10 @@ class _IoConfig:
                     spk_fmt_str += f"s{pkt_charge_width}"
             case IoType.STREAM:
                 spk_names = [flg.name for flg in StreamFlag]
+                spk_fmt_str = "b1" * len(StreamFlag)
                 spk_names += list(range(net_num_io))
-                spk_fmt_str = f"s{pkt_charge_width}" if pkt_charge_width else "b1"
-                spk_fmt_str = "".join("b1" * self._network.num_outputs())
+                spk_fmt_elem = f"s{pkt_charge_width}" if pkt_charge_width else "b1"
+                spk_fmt_str += spk_fmt_elem * net_num_io
             case _:
                 raise ValueError()
         self.spk_fmt = bs.compile(spk_fmt_str, spk_names)
@@ -217,7 +218,7 @@ class Processor(neuro.Processor):
                 self._hw_rx(self._max_run, True)
             case IoType.STREAM:
                 while self._interface.poll(1):
-                    self._interface.read(self._interface.input_waiting)
+                    self._interface.read(self._interface.input_waiting())
 
         self._inp.clear()
         self._out.clear()
@@ -338,17 +339,12 @@ class Processor(neuro.Processor):
                     for out_idx in range(self._network.num_outputs()):
                         if out_dict[out_idx]:
                             self._out.queue[out_idx].append(float(self._out.time))
-                    if out_dict[StreamFlag.CLR.name]:
-                        if seek_clr:
-                            return
-                        elif self._out.time:
-                            raise RuntimeError(
-                                "Should not have received CLR during run()"
-                            )
+                    if out_dict[StreamFlag.CLR.name] and self._out.time:
+                        raise RuntimeError("Should not have received CLR during run()")
 
                     self._out.time += 1
 
-                    if out_dict[StreamFlag.FIN.name] != (self._out.time == target):
+                    if out_dict[StreamFlag.FIN.name] != (self._out.time - 1 == target):
                         raise RuntimeError(
                             f"FIN flag {bool(out_dict[StreamFlag.FIN.name])}"
                             f" does NOT match timing {self._out.time}/{target}"

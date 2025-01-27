@@ -43,10 +43,6 @@ module network_sink #(
     assign net_ready = snk_ready;   // stream source is ready iff sink is ready
     assign snk_valid = net_valid;   // sink is ready iff stream source is valid
 
-    always_comb begin: calc_fin
-        snk[PKT_WIDTH - PFX_WIDTH + FIN] = net_last;
-    end
-
     // have to capture net_arstn
     logic rst;
     always_ff @(posedge clk or negedge arstn or negedge net_arstn) begin: set_rst
@@ -62,7 +58,10 @@ module network_sink #(
     end
 
     always_comb begin: calc_snk
-        for (int i = 0; i < PKT_WIDTH; i++)
+        snk = 0;
+        snk[PKT_WIDTH - FIN - 1] = net_last;
+        snk[PKT_WIDTH - CLR - 1] = rst;
+        for (int i = 0; i < NUM_OUT; i++)
             snk[PKT_WIDTH - PFX_WIDTH - i - 1] = net_out[i];
     end
 endmodule
