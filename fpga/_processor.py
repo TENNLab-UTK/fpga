@@ -213,10 +213,10 @@ class Processor(neuro.Processor):
                 ]
             )
         self._interface.flush()
-        match self._out.type:
-            case IoType.DISPATCH:
+        match (self._inp.type, self._out.type):
+            case (IoType.DISPATCH, IoType.DISPATCH):
                 self._hw_rx(self._max_run, True)
-            case IoType.STREAM:
+            case _:
                 while self._interface.poll(1):
                     self._interface.read(self._interface.input_waiting())
 
@@ -314,10 +314,12 @@ class Processor(neuro.Processor):
                         case DispatchOpcode.CLR:
                             if seek_clr:
                                 return
-                            elif self._out.time:
+                            elif self._out.time and self._inp.type == IoType.DISPATCH:
                                 raise RuntimeError(
                                     "Should not have received CLR during run()"
                                 )
+                            else:
+                                self._out.time = 0
                         case _:
                             raise ValueError()
                     if (
