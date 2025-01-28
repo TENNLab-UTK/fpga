@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Keegan Dent
+# Copyright (c) 2024-2025 Keegan Dent
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -44,8 +44,6 @@ neuro.Spike.__gt__ = lambda self, other: self.time > other.time
 neuro.Spike.__ge__ = lambda self, other: self.time >= other.time
 
 
-# can't believe I have to roll my own priority queue in the year 2024
-# and no, queue.PriorityQueue has wasted thread safety
 class _InpQueue(list):
     def __init__(self, data: Iterable[neuro.Spike]):
         super().__init__(data)
@@ -93,10 +91,10 @@ class _IoConfig:
     def __init__(
         self,
         io_type: IoType,
-        net_num_io: int,
-        pkt_charge_width: int,
-        is_axi,
+        net: neuro.Network,
+        is_axi: bool = True,
     ):
+        self._network = net
         self.type = io_type
         match self.type:
             case IoType.DISPATCH:
@@ -104,7 +102,7 @@ class _IoConfig:
                 spk_names = ["opcode"]
                 spk_fmt_str = f"u{opc_width}"
                 idx_width, operand_width = dispatch_operand_widths(
-                    opc_width, net_num_io, pkt_charge_width, is_axi
+                    opc_width, self._num_net_io(), self._charge_width(), is_axi
                 )
 
                 cmd_names = spk_names + ["operand"]
@@ -114,15 +112,18 @@ class _IoConfig:
                 if idx_width:
                     spk_names.append("idx")
                     spk_fmt_str += f"u{idx_width}"
-                if pkt_charge_width:
+                if self._charge_width():
                     spk_names.append("val")
-                    spk_fmt_str += f"s{pkt_charge_width}"
+                    spk_fmt_str += f"s{self._charge_width()}"
             case IoType.STREAM:
                 spk_names = [flg.name for flg in StreamFlag]
                 spk_fmt_str = "b1" * len(StreamFlag)
-                spk_names += list(range(net_num_io))
-                spk_fmt_elem = f"s{pkt_charge_width}" if pkt_charge_width else "b1"
-                spk_fmt_str += spk_fmt_elem * net_num_io
+                spk_fmt_elem = (
+                    f"s{self._charge_width()}" if self._charge_width() else "b1"
+                )
+                for io in range(self._num_net_io()):
+                    spk_names.append(io)
+                    spk_fmt_str += spk_fmt_elem
             case _:
                 raise ValueError()
         self.spk_fmt = bs.compile(spk_fmt_str, spk_names)
@@ -134,22 +135,31 @@ class _IoConfig:
 
 
 class InpConfig(_IoConfig):
-    def __init__(self, io_type: IoType, net: neuro.Network, is_axi: bool = True):
-        super().__init__(io_type, net.num_inputs(), charge_width(net), is_axi)
 
     def clear(self):
         super().clear()
         self.queue = _InpQueue([])
 
+    def _num_net_io(self):
+        return self._network.num_inputs()
+
+    def _charge_width(self):
+        # TODO: support fires input
+        return charge_width(self._network)
+
 
 class OutConfig(_IoConfig):
-    def __init__(self, io_type: IoType, net: neuro.Network, is_axi: bool = True):
-        self._num_outputs = net.num_outputs()
-        super().__init__(io_type, self._num_outputs, 0, is_axi)
 
     def clear(self):
         super().clear()
-        self.queue = {out: [] for out in range(self._num_outputs)}
+        self.queue = {out: [] for out in range(self._network.num_outputs())}
+
+    def _num_net_io(self):
+        return self._network.num_outputs()
+
+    def _charge_width(cls):
+        # TODO: support charges output
+        return 0
 
 
 class Processor(neuro.Processor):
@@ -272,7 +282,9 @@ class Processor(neuro.Processor):
             run_time = int(self._inp.queue[0].time) if self._inp.queue else target_time
             while self._inp.time < run_time:
                 num_runs = min(self._max_run, run_time - self._inp.time)
-                while (self._inp.time + num_runs - self._out.time) > self._max_run:
+                while (
+                    self._inp.time + num_runs - self._out.time
+                ) > self._max_runs_ahead:
                     sleep(100e-9)
                 self._hw_tx(
                     spikes,
@@ -289,10 +301,7 @@ class Processor(neuro.Processor):
         while True:
             while self._out.time == self._inp.time and not seek_clr:
                 sleep(100e-9)
-            rx = self._interface.read(
-                num_rx_bytes,
-                1000.0 * self._secs_per_run * (target - self._out.time),
-            )[::-1]
+            rx = self._interface.read(num_rx_bytes, 1)[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
 
@@ -319,7 +328,7 @@ class Processor(neuro.Processor):
                                     "Should not have received CLR during run()"
                                 )
                             else:
-                                self._out.time = 0
+                                self._out.clear()
                         case _:
                             raise ValueError()
                     if (
@@ -568,6 +577,7 @@ class Processor(neuro.Processor):
                 raise ValueError()
         self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
         self._max_run = SYSTEM_BUFFER // max_bytes_per_run
+        self._max_runs_ahead = self._max_run
 
         match self._inp.type:
             case IoType.DISPATCH:
