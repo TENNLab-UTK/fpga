@@ -297,13 +297,19 @@ class Processor(neuro.Processor):
     def _hw_rx(self, runs: int, seek_clr: bool = False) -> None:
         num_rx_bytes = width_bits_to_bytes(self._out.spk_fmt.calcsize())
         target = self._out.time + runs - 1
+        seek_spks = False
 
         while True:
             while self._out.time == self._inp.time and not seek_clr:
                 sleep(100e-9)
-            rx = self._interface.read(num_rx_bytes, 1)[::-1]
+            rx = self._interface.read(
+                num_rx_bytes,
+                1000.0 * self._secs_per_run * (target - self._out.time),
+            )[::-1]
             if len(rx) != num_rx_bytes:
-                raise RuntimeError("Did not receive coherent response from target.")
+                if not seek_spks:
+                    raise RuntimeError("Did not receive coherent response from target.")
+                break
 
             match self._out.type:
                 case IoType.DISPATCH:
@@ -343,7 +349,7 @@ class Processor(neuro.Processor):
                             f" does NOT match timing {self._out.time}/{target}"
                         )
                     elif out_dict["opcode"] == DispatchOpcode.FIN:
-                        break
+                        seek_spks = True
 
                 case IoType.STREAM:
                     out_dict = self._out.spk_fmt.unpack(rx)
