@@ -43,7 +43,7 @@ module network_source #(
     assign net_valid = src_valid;
     assign src_ready = net_ready;
 
-    assign net_last = src[PKT_WIDTH - FIN - 1];
+    assign net_last = src[PKT_WIDTH - SNC - 1];
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;

@@ -67,12 +67,12 @@ class IoType(Enum):
 class DispatchOpcode(IntEnum):
     RUN = 0
     SPK = auto()
-    FIN = auto()
+    SNC = auto()
     CLR = auto()
 
 
 class StreamFlag(IntEnum):
-    FIN = 0
+    SNC = 0
     CLR = auto()
 
 
@@ -315,7 +315,7 @@ class Processor(neuro.Processor):
                 case IoType.DISPATCH:
                     out_dict = self._out.spk_fmt.unpack(rx)
                     match out_dict["opcode"]:
-                        case DispatchOpcode.RUN | DispatchOpcode.FIN:
+                        case DispatchOpcode.RUN | DispatchOpcode.SNC:
                             ran = self._out.cmd_fmt.unpack(rx)["operand"]
                             self._out.time += ran
                         case DispatchOpcode.SPK:
@@ -338,7 +338,7 @@ class Processor(neuro.Processor):
                         case _:
                             raise ValueError()
                     if (
-                        (out_dict["opcode"] == DispatchOpcode.FIN)
+                        (out_dict["opcode"] == DispatchOpcode.SNC)
                         and (self._out.time < target)
                     ) or (
                         (out_dict["opcode"] == DispatchOpcode.RUN)
@@ -348,7 +348,7 @@ class Processor(neuro.Processor):
                             f"Opcode {DispatchOpcode(out_dict['opcode']).name}"
                             f" does NOT match timing {self._out.time}/{target}"
                         )
-                    elif out_dict["opcode"] == DispatchOpcode.FIN:
+                    elif out_dict["opcode"] == DispatchOpcode.SNC:
                         seek_spks = True
 
                 case IoType.STREAM:
@@ -361,12 +361,12 @@ class Processor(neuro.Processor):
 
                     self._out.time += 1
 
-                    if out_dict[StreamFlag.FIN.name] != (self._out.time - 1 == target):
+                    if out_dict[StreamFlag.SNC.name] != (self._out.time - 1 == target):
                         raise RuntimeError(
-                            f"FIN flag {bool(out_dict[StreamFlag.FIN.name])}"
+                            f"SNC flag {bool(out_dict[StreamFlag.SNC.name])}"
                             f" does NOT match timing {self._out.time}/{target}"
                         )
-                    elif out_dict[StreamFlag.FIN.name]:
+                    elif out_dict[StreamFlag.SNC.name]:
                         break
 
     def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int, last: bool) -> None:
@@ -402,7 +402,7 @@ class Processor(neuro.Processor):
                         self._inp.cmd_fmt.pack(
                             {
                                 "opcode": (
-                                    DispatchOpcode.FIN if last else DispatchOpcode.RUN
+                                    DispatchOpcode.SNC if last else DispatchOpcode.RUN
                                 ),
                                 "operand": runs,
                             }
@@ -416,13 +416,13 @@ class Processor(neuro.Processor):
                         "Cannot send spikes to stream source without running."
                     )
                 run_dict = {inp_idx: 0 for inp_idx in range(self._network.num_inputs())}
-                run_dict[StreamFlag.FIN.name] = False
+                run_dict[StreamFlag.SNC.name] = False
                 run_dict[StreamFlag.CLR.name] = False
                 temp = run_dict.copy()
                 temp.update(spike_dict)
                 spike_dict = temp
 
-                spike_dict[StreamFlag.FIN.name] = last and (runs == 1)
+                spike_dict[StreamFlag.SNC.name] = last and (runs == 1)
                 if self._inp.time == 0:
                     spike_dict[StreamFlag.CLR.name] = True
                 self._interface.write(self._inp.spk_fmt.pack(spike_dict)[::-1])
@@ -430,7 +430,7 @@ class Processor(neuro.Processor):
 
                 for r in reversed(range(runs - 1)):
                     if last and r == 0:
-                        run_dict[StreamFlag.FIN.name] = True
+                        run_dict[StreamFlag.SNC.name] = True
                     self._interface.write(self._inp.spk_fmt.pack(run_dict)[::-1])
                     pause(1)
 

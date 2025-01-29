@@ -55,7 +55,7 @@ module network_source #(
         if (arstn == 0) begin
             run_counter <= 0;
         end else begin
-            if (src_valid && src_ready && (op == RUN || op == FIN)) begin
+            if (src_valid && src_ready && (op == RUN || op == SNC)) begin
                 run_counter <= src[(PKT_WIDTH - PFX_WIDTH - 1) : 0];
             end else if (net_valid && net_ready) begin
                 run_counter <= run_counter - 1;
@@ -69,7 +69,7 @@ module network_source #(
     always_ff @(posedge clk or negedge arstn) begin: set_last
         if (arstn == 0) begin
             last <= 0;
-        end else if (src_valid && src_ready && op == FIN) begin
+        end else if (src_valid && src_ready && op == SNC) begin
             last <= 1;
         end else if (net_valid && net_ready && net_last) begin
             last <= 0;

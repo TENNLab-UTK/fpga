@@ -13,7 +13,7 @@ package dispatch_config;
         // 2-bit codes used by Source and Sink
         RUN = 0,
         SPK,
-        FIN,
+        SNC,
         CLR,
         // 3-bit codes used only by Procedure Source
         R04,
@@ -32,7 +32,7 @@ endpackage
 
 package stream_config;
     typedef enum {
-        FIN = 0,
+        SNC = 0,
         CLR,
         // not a valid flag position, purely for counting
         NUM_FLG

@@ -59,7 +59,7 @@ module network_sink #(
 
     always_comb begin: calc_snk
         snk = 0;
-        snk[PKT_WIDTH - FIN - 1] = net_last;
+        snk[PKT_WIDTH - SNC - 1] = net_last;
         snk[PKT_WIDTH - CLR - 1] = rst;
         for (int i = 0; i < NUM_OUT; i++)
             snk[PKT_WIDTH - PFX_WIDTH - i - 1] = net_out[i];

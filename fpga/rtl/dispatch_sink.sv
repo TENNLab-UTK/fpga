@@ -108,7 +108,7 @@ module network_sink #(
         snk_valid = 0;
         case (curr_state)
             RUNS: begin
-                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = last ? FIN : RUN;
+                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = last ? SNC : RUN;
                 snk[PKT_WIDTH - PFX_WIDTH - 1 : 0] = runs;
                 snk_valid = 1;
             end
