@@ -32,7 +32,7 @@ module network_source #(
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
-    output logic net_last,
+    output logic net_sync,
     // network signals
     output logic net_arstn,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
@@ -43,7 +43,7 @@ module network_source #(
     assign net_valid = src_valid;
     assign src_ready = net_ready;
 
-    assign net_last = src[PKT_WIDTH - SNC - 1];
+    assign net_sync = src[PKT_WIDTH - SNC - 1];
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;

@@ -27,7 +27,7 @@ module network_sink #(
     // network handshake signals
     input logic net_arstn,
     input logic net_valid,
-    input logic net_last,
+    input logic net_sync,
     output logic net_ready,
     // network signals
     input logic [network_config::NUM_OUT-1:0] net_out,
@@ -59,7 +59,7 @@ module network_sink #(
 
     always_comb begin: calc_snk
         snk = 0;
-        snk[PKT_WIDTH - SNC - 1] = net_last;
+        snk[PKT_WIDTH - SNC - 1] = net_sync;
         snk[PKT_WIDTH - CLR - 1] = rst;
         for (int i = 0; i < NUM_OUT; i++)
             snk[PKT_WIDTH - PFX_WIDTH - i - 1] = net_out[i];

@@ -369,7 +369,7 @@ class Processor(neuro.Processor):
                     elif out_dict[StreamFlag.SNC.name]:
                         break
 
-    def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int, last: bool) -> None:
+    def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int, sync: bool) -> None:
         spike_dict = {
             self._network.get_node(s.id).input_id: int(
                 s.value * spike_value_factor(self._network)
@@ -402,7 +402,7 @@ class Processor(neuro.Processor):
                         self._inp.cmd_fmt.pack(
                             {
                                 "opcode": (
-                                    DispatchOpcode.SNC if last else DispatchOpcode.RUN
+                                    DispatchOpcode.SNC if sync else DispatchOpcode.RUN
                                 ),
                                 "operand": runs,
                             }
@@ -422,14 +422,14 @@ class Processor(neuro.Processor):
                 temp.update(spike_dict)
                 spike_dict = temp
 
-                spike_dict[StreamFlag.SNC.name] = last and (runs == 1)
+                spike_dict[StreamFlag.SNC.name] = sync and (runs == 1)
                 if self._inp.time == 0:
                     spike_dict[StreamFlag.CLR.name] = True
                 self._interface.write(self._inp.spk_fmt.pack(spike_dict)[::-1])
                 pause(1)
 
                 for r in reversed(range(runs - 1)):
-                    if last and r == 0:
+                    if sync and r == 0:
                         run_dict[StreamFlag.SNC.name] = True
                     self._interface.write(self._inp.spk_fmt.pack(run_dict)[::-1])
                     pause(1)

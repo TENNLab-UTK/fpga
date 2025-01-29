@@ -33,7 +33,7 @@ module network_source #(
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
-    output logic net_last,
+    output logic net_sync,
     // network signals
     output logic net_arstn,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
@@ -63,16 +63,16 @@ module network_source #(
         end
     end
 
-    logic last;
-    assign net_last = last && run_counter == 1;
+    logic sync;
+    assign net_sync = sync && run_counter == 1;
 
     always_ff @(posedge clk or negedge arstn) begin: set_last
         if (arstn == 0) begin
-            last <= 0;
+            sync <= 0;
         end else if (src_valid && src_ready && op == SNC) begin
-            last <= 1;
-        end else if (net_valid && net_ready && net_last) begin
-            last <= 0;
+            sync <= 1;
+        end else if (net_valid && net_ready && net_sync) begin
+            sync <= 0;
         end
     end
 

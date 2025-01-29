@@ -31,7 +31,7 @@ module axis_processor (
     import network_config::*;
     import processor_config::*;
 
-    logic net_valid, net_ready, net_last, net_arstn;
+    logic net_valid, net_ready, net_sync, net_arstn;
     logic signed [CHARGE_WIDTH-1:0] net_inp [0:NUM_INP-1];
     logic [NUM_OUT-1:0] net_out;
 
@@ -45,7 +45,7 @@ module axis_processor (
         .src(s_axis_tdata[(INP_WIDTH - 1) -: SRC_PKT_WIDTH]),
         .net_ready,
         .net_valid,
-        .net_last,
+        .net_sync,
         .net_arstn,
         .net_inp
     );
@@ -66,7 +66,7 @@ module axis_processor (
         .clk,
         .arstn,
         .net_valid,
-        .net_last,
+        .net_sync,
         .net_ready,
         .net_out,
         .net_arstn,

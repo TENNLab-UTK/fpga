@@ -26,7 +26,7 @@ module network_sink #(
     input logic arstn,
     // network handshake signals
     input logic net_valid,
-    input logic net_last,
+    input logic net_sync,
     output logic net_ready,
     // network signals
     input logic net_arstn,
@@ -75,18 +75,18 @@ module network_sink #(
     end
 
     logic [NUM_OUT-1:0] fires;
-    logic last;
+    logic sync;
 
     always_ff @(posedge clk or negedge arstn) begin: set_data
         if (arstn == 0) begin
             fires <= 0;
-            last <= 0;
+            sync <= 0;
         end else if (net_valid && net_ready) begin
             fires <= net_out;
-            last <= net_last;
+            sync <= net_sync;
         end else if (next_state == IDLE) begin
             fires <= 0;
-            last <= 0;
+            sync <= 0;
         end
     end
 
@@ -108,7 +108,7 @@ module network_sink #(
         snk_valid = 0;
         case (curr_state)
             RUNS: begin
-                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = last ? SNC : RUN;
+                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = sync ? SNC : RUN;
                 snk[PKT_WIDTH - PFX_WIDTH - 1 : 0] = runs;
                 snk_valid = 1;
             end
@@ -134,7 +134,7 @@ module network_sink #(
                 if (net_valid && |net_out)
                     next_state = SPKS;
                 if (run_counter > 0 && (rst || (
-                    net_valid && (|net_out || net_last || &run_counter)
+                    net_valid && (|net_out || net_sync || &run_counter)
                 )))
                     next_state = RUNS;
             end
