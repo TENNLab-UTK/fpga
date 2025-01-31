@@ -33,9 +33,9 @@ module network_source #(
     // network handshake signals
     input logic net_ready,
     output logic net_valid,
-    output logic net_sync,
     // network signals
     output logic net_arstn,
+    output logic net_sync,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
     import dispatch_config::*;
@@ -48,7 +48,7 @@ module network_source #(
     end
 
     logic [RUN_WIDTH-1:0] run_counter;
-    assign src_ready = (run_counter <= 1);
+    assign src_ready = (run_counter == 0) || (run_counter == 1 && net_ready);
     assign net_valid = (run_counter > 0);
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
