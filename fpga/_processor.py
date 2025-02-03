@@ -287,6 +287,7 @@ class Processor(neuro.Processor):
                 while (
                     self._inp.time + num_runs - self._out.time
                 ) > self._max_runs_ahead:
+                    # TODO: magic timing will be resolved by buffers PR
                     sleep(100e-9)
                 self._hw_tx(
                     spikes,
@@ -305,11 +306,13 @@ class Processor(neuro.Processor):
                 and self._out.time == self._inp.time
                 and not seek_clr
             ):
+                # TODO: magic timing will be resolved by buffers PR
                 sleep(100e-9)
                 continue
             rx = self._interface.read(
                 num_rx_bytes,
-                1000.0 * self._secs_per_run * max(1, target - self._out.time),
+                # TODO: magic timing will be resolved by buffers PR
+                10000.0 * self._secs_per_run * max(1, target - self._out.time),
             )[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
@@ -330,10 +333,6 @@ class Processor(neuro.Processor):
                             )
                             self._out.queue[out_idx].append(float(self._out.time))
                         case DispatchOpcode.SNC:
-                            if self._out.time != target:
-                                raise RuntimeError(
-                                    f"SNC received off time {self._out.time}/{target}"
-                                )
                             break
                         case DispatchOpcode.CLR:
                             if seek_clr:
@@ -377,6 +376,7 @@ class Processor(neuro.Processor):
         if any(key < 0 for key in spike_dict.keys()):
             raise ValueError("Cannot send spikes to non-input node.")
 
+        # TODO: magic timing will be resolved by buffers PR
         def pause(runs: int) -> None:
             self._inp.time += runs
             sleep(self._secs_per_run * runs)

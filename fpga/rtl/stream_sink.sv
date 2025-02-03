@@ -44,35 +44,36 @@ module network_sink #(
     assign snk_valid = net_en;      // sink is ready iff network has run
 
     // have to capture net_arstn
-    logic rst;
-    always_ff @(posedge clk or negedge arstn or negedge net_arstn) begin: set_rst
+    logic rst_n;
+    always_ff @(negedge clk or negedge arstn) begin: set_rst
         if (arstn == 0) begin
-            // we don't report a clear for the global reset
-            rst <= 0;
-        end else if (net_arstn == 0) begin
-            rst <= 1;
-        end else if (snk_valid && snk_ready) begin
-            // clear reported
-            rst <= 0;
+            rst_n <= 0;
+        end else begin
+            if (net_arstn == 0)
+                rst_n <= 1;
+            else if (snk_valid && snk_ready)
+                // clear reported
+                rst_n <= 0;
         end
     end
 
     // have to capture net_sync
     logic sync;
-    always_ff @(posedge clk or negedge arstn or posedge net_sync) begin: set_sync
+    always_ff @(posedge clk or negedge arstn) begin: set_sync
         if (arstn == 0) begin
             sync <= 0;
-        end else if (snk_valid && sync_ready) begin
-            sync <= 0;
-        end else if (net_sync) begin
-            sync <= 1;
+        end else begin
+            if (snk_valid && snk_ready)
+                sync <= 0;
+            else if (net_sync)
+                sync <= 1;
         end
     end
 
     always_comb begin: calc_snk
         snk = 0;
-        snk[PKT_WIDTH - SNC - 1] = sync;
-        snk[PKT_WIDTH - CLR - 1] = rst;
+        snk[PKT_WIDTH - SNC - 1] = sync || net_sync;
+        snk[PKT_WIDTH - CLR - 1] = rst_n;
         for (int i = 0; i < NUM_OUT; i++)
             snk[PKT_WIDTH - PFX_WIDTH - i - 1] = net_out[i];
     end
