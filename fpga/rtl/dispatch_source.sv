@@ -100,18 +100,12 @@ module network_source #(
             for (int i = 0; i < NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
-            if (net_en) begin
+            if (net_en || (src_valid && src_ready && op == CLR)) begin
                 for (int i = 0; i < NUM_INP; i++)
                     net_inp[i] <= 0;
-            end else if (src_valid && src_ready) begin
-                case (op)
-                    SPK:
-                        net_inp[inp_idx] <= inp_val;
-                    CLR: begin
-                        for (int i = 0; i < NUM_INP; i++)
-                            net_inp[i] <= 0;
-                    end
-                endcase
+            end
+            if (src_valid && src_ready && op == SPK) begin
+                net_inp[inp_idx] <= inp_val;
             end
         end
     end
