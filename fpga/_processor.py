@@ -356,12 +356,15 @@ class Processor(neuro.Processor):
 
                     self._out.time += 1
 
-                    if out_dict[StreamFlag.SNC.name] != (self._out.time == target):
+                    # don't check DISO because SNC can't travel back in time
+                    if self._inp.type == IoType.STREAM and (
+                        out_dict[StreamFlag.SNC.name] != (self._out.time == target)
+                    ):
                         raise RuntimeError(
                             f"SNC flag {bool(out_dict[StreamFlag.SNC.name])}"
                             f" does NOT match timing {self._out.time}/{target}"
                         )
-                    elif out_dict[StreamFlag.SNC.name]:
+                    if self._out.time == target:
                         break
 
     def _hw_tx(
