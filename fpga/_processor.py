@@ -326,9 +326,9 @@ class Processor(neuro.Processor):
                             self._out.time += ran
                         case DispatchOpcode.SPK:
                             out_idx = (
-                                out_dict["out_idx"]
+                                out_dict["idx"]
                                 if len(self._out.spk_fmt._infos) > 1
-                                and "out_idx" == self._out.spk_fmt._infos[1].name
+                                and self._out.spk_fmt._infos[1].name == "idx"
                                 else 0
                             )
                             self._out.queue[out_idx].append(float(self._out.time))
