@@ -62,26 +62,34 @@ module network_sink #(
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
             run_counter <= 0;
+        end else begin
+            if (net_en)
+                run_counter <= run_counter + 1;
+            else if (curr_state == RUNS && next_state != RUNS)
+                run_counter <= run_counter - runs;
+        end
+    end
+
+    always_ff @(posedge clk or negedge arstn) begin: set_runs
+        if (arstn == 0) begin
             runs <= 0;
         end else begin
-            if (net_en) begin
-                run_counter <= run_counter + 1;
+            if (curr_state == IDLE)
                 runs <= run_counter;
-            end else if (curr_state == RUNS && next_state != RUNS) begin
-                run_counter <= run_counter - runs;
-            end
         end
     end
 
     logic [NUM_OUT-1:0] fires;
 
     always_ff @(posedge clk or negedge arstn) begin: set_fires
-        if (arstn == 0)
+        if (arstn == 0) begin
             fires <= 0;
-        else if (net_en)
-            fires <= net_out;
-        else if (curr_state == SPKS && next_state != SPKS)
-            fires <= 0;
+        end else begin
+            if (net_en)
+                fires <= net_out;
+            else if (curr_state == SPKS && next_state != SPKS)
+                fires <= 0;
+        end
     end
 
     logic [$clog2(NUM_OUT + 1) : 0] fire_counter;
@@ -100,12 +108,14 @@ module network_sink #(
     logic sync;
 
     always_ff @(posedge clk or negedge arstn) begin: set_sync
-        if (arstn == 0)
+        if (arstn == 0) begin
             sync <= 0;
-        else if (curr_state == IDLE && next_state != IDLE)
-            sync <= net_sync;
-        else if (curr_state == SYNC && next_state != SYNC)
-            sync <= 0;
+        end else begin
+            if (curr_state == IDLE && next_state != IDLE)
+                sync <= net_sync;
+            else if (curr_state == SYNC && next_state != SYNC)
+                sync <= 0;
+        end
     end
 
     always_comb begin: calc_snk

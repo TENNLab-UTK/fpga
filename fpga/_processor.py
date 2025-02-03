@@ -273,7 +273,7 @@ class Processor(neuro.Processor):
         if time < 1:
             raise ValueError("It's not possible to run for less than 1 timestep")
         target_time = self._inp.time + time
-        rx_thread = Thread(target=self._hw_rx, args=(target_time - 1,))
+        rx_thread = Thread(target=self._hw_rx, args=(target_time,))
         rx_thread.daemon = True
         rx_thread.start()
         self._last_run = self._inp.time
@@ -300,8 +300,13 @@ class Processor(neuro.Processor):
         num_rx_bytes = width_bits_to_bytes(self._out.spk_fmt.calcsize())
 
         while True:
-            while self._out.time == self._inp.time and not seek_clr:
+            if (
+                self._inp.time != target
+                and self._out.time == self._inp.time
+                and not seek_clr
+            ):
                 sleep(100e-9)
+                continue
             rx = self._interface.read(
                 num_rx_bytes,
                 1000.0 * self._secs_per_run * max(1, target - self._out.time),
@@ -352,7 +357,7 @@ class Processor(neuro.Processor):
 
                     self._out.time += 1
 
-                    if out_dict[StreamFlag.SNC.name] != (self._out.time - 1 == target):
+                    if out_dict[StreamFlag.SNC.name] != (self._out.time == target):
                         raise RuntimeError(
                             f"SNC flag {bool(out_dict[StreamFlag.SNC.name])}"
                             f" does NOT match timing {self._out.time}/{target}"
