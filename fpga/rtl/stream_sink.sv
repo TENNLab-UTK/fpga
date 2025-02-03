@@ -25,11 +25,11 @@ module network_sink #(
     input logic clk,
     input logic arstn,
     // network handshake signals
-    input logic net_arstn,
-    input logic net_valid,
     input logic net_sync,
     output logic net_ready,
     // network signals
+    input logic net_arstn,
+    input logic net_en,
     input logic [network_config::NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
@@ -41,7 +41,7 @@ module network_sink #(
     import sink_config::*;
 
     assign net_ready = snk_ready;   // stream source is ready iff sink is ready
-    assign snk_valid = net_valid;   // sink is ready iff stream source is valid
+    assign snk_valid = net_en;      // sink is ready iff network has run
 
     // have to capture net_arstn
     logic rst;
@@ -57,9 +57,21 @@ module network_sink #(
         end
     end
 
+    // have to capture net_sync
+    logic sync;
+    always_ff @(posedge clk or negedge arstn or posedge net_sync) begin: set_sync
+        if (arstn == 0) begin
+            sync <= 0;
+        end else if (snk_valid && sync_ready) begin
+            sync <= 0;
+        end else if (net_sync) begin
+            sync <= 1;
+        end
+    end
+
     always_comb begin: calc_snk
         snk = 0;
-        snk[PKT_WIDTH - SNC - 1] = net_sync;
+        snk[PKT_WIDTH - SNC - 1] = sync;
         snk[PKT_WIDTH - CLR - 1] = rst;
         for (int i = 0; i < NUM_OUT; i++)
             snk[PKT_WIDTH - PFX_WIDTH - i - 1] = net_out[i];

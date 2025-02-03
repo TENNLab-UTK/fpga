@@ -32,10 +32,10 @@ module network_source #(
     input logic [PKT_WIDTH-1:0] src,
     // network handshake signals
     input logic net_ready,
-    output logic net_valid,
+    output logic net_sync,
     // network signals
     output logic net_arstn,
-    output logic net_sync,
+    output logic net_en,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
     import dispatch_config::*;
@@ -48,31 +48,29 @@ module network_source #(
     end
 
     logic [RUN_WIDTH-1:0] run_counter;
-    assign src_ready = (run_counter == 0) || (run_counter == 1 && net_ready);
-    assign net_valid = (run_counter > 0);
+    assign net_en = (run_counter > 0) && net_ready;
+    // only ready for new dispatch when nothing to send or will be done sending this clk
+    assign src_ready = ((run_counter == 0) && !net_sync) || (run_counter <= 1 && net_ready);
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
             run_counter <= 0;
         end else begin
-            if (src_valid && src_ready && (op == RUN || op == SNC)) begin
+            if (src_valid && src_ready && op == RUN) begin
                 run_counter <= src[(PKT_WIDTH - PFX_WIDTH - 1) : 0];
-            end else if (net_valid && net_ready) begin
+            end else if (net_en) begin
                 run_counter <= run_counter - 1;
             end
         end
     end
 
-    logic sync;
-    assign net_sync = sync && run_counter == 1;
-
-    always_ff @(posedge clk or negedge arstn) begin: set_last
+    always_ff @(posedge clk or negedge arstn) begin: set_net_sync
         if (arstn == 0) begin
-            sync <= 0;
+            net_sync <= 0;
         end else if (src_valid && src_ready && op == SNC) begin
-            sync <= 1;
-        end else if (net_valid && net_ready && net_sync) begin
-            sync <= 0;
+            net_sync <= 1;
+        end else if (net_ready) begin
+            net_sync <= 0;
         end
     end
 
@@ -102,7 +100,7 @@ module network_source #(
             for (int i = 0; i < NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
-            if (net_valid && net_ready) begin
+            if (net_en) begin
                 for (int i = 0; i < NUM_INP; i++)
                     net_inp[i] <= 0;
             end else if (src_valid && src_ready) begin

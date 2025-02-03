@@ -25,11 +25,11 @@ module network_sink #(
     input logic clk,
     input logic arstn,
     // network handshake signals
-    input logic net_valid,
     input logic net_sync,
     output logic net_ready,
     // network signals
     input logic net_arstn,
+    input logic net_en,
     input logic [network_config::NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
@@ -40,10 +40,10 @@ module network_sink #(
     import dispatch_config::*;
     import sink_config::*;
 
-    typedef enum logic [1:0] {IDLE, RUNS, SPKS, CLRD} state_t;
+    typedef enum logic [2:0] {IDLE, RUNS, CLRD, SPKS, SYNC} state_t;
     state_t curr_state, next_state;
 
-    assign net_ready = curr_state == IDLE;
+    assign net_ready = (curr_state == IDLE);
 
     logic rst; // latch set when net_arstn == 0, reset when clear dispatched
 
@@ -64,30 +64,24 @@ module network_sink #(
             run_counter <= 0;
             runs <= 0;
         end else begin
-            if (curr_state == IDLE && next_state != IDLE) begin
-                // replace run received while sending a dispatch
-                run_counter <= net_valid;
-                runs <= run_counter;
-            end else if (net_valid && net_ready) begin
+            if (net_en) begin
                 run_counter <= run_counter + 1;
+                runs <= run_counter;
+            end else if (curr_state == RUNS && next_state != RUNS) begin
+                run_counter <= run_counter - runs;
             end
         end
     end
 
     logic [NUM_OUT-1:0] fires;
-    logic sync;
 
-    always_ff @(posedge clk or negedge arstn) begin: set_data
-        if (arstn == 0) begin
+    always_ff @(posedge clk or negedge arstn) begin: set_fires
+        if (arstn == 0)
             fires <= 0;
-            sync <= 0;
-        end else if (net_valid && net_ready) begin
+        else if (net_en)
             fires <= net_out;
-            sync <= net_sync;
-        end else if (next_state == IDLE) begin
+        else if (curr_state == SPKS && next_state != SPKS)
             fires <= 0;
-            sync <= 0;
-        end
     end
 
     logic [$clog2(NUM_OUT + 1) : 0] fire_counter;
@@ -103,13 +97,28 @@ module network_sink #(
         end
     end
 
+    logic sync;
+
+    always_ff @(posedge clk or negedge arstn) begin: set_sync
+        if (arstn == 0)
+            sync <= 0;
+        else if (curr_state == IDLE && next_state != IDLE)
+            sync <= net_sync;
+        else if (curr_state == SYNC && next_state != SYNC)
+            sync <= 0;
+    end
+
     always_comb begin: calc_snk
         snk = 0;
         snk_valid = 0;
         case (curr_state)
             RUNS: begin
-                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = sync ? SNC : RUN;
+                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = RUN;
                 snk[PKT_WIDTH - PFX_WIDTH - 1 : 0] = runs;
+                snk_valid = 1;
+            end
+            CLRD: begin
+                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = CLR;
                 snk_valid = 1;
             end
             SPKS: begin
@@ -118,45 +127,57 @@ module network_sink #(
                     snk[(PKT_WIDTH - PFX_WIDTH - 1) -: SPK_WIDTH] = NUM_OUT - fire_counter;
                 snk_valid = fires[NUM_OUT - fire_counter];
             end
-            CLRD: begin
-                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = CLR;
+            SYNC: begin
+                snk[(PKT_WIDTH - 1) -: PFX_WIDTH] = SNC;
                 snk_valid = 1;
             end
         endcase
     end
 
-    always_comb begin: calc_next_states
+    always_comb begin: calc_next_state
         next_state = curr_state;
         case (curr_state)
             IDLE: begin
+                if (net_sync)
+                    next_state = SYNC;
+                if (net_en && |net_out)
+                    next_state = SPKS;
                 if (rst)
                     next_state = CLRD;
-                if (net_valid && |net_out)
-                    next_state = SPKS;
-                if (run_counter > 0 && (rst || (
-                    net_valid && (|net_out || net_sync || &run_counter)
-                )))
+                if (&run_counter)
+                    next_state = RUNS;
+                if (run_counter > 0 && (rst || (net_en && |net_out) || net_sync))
                     next_state = RUNS;
             end
             RUNS: begin
                 if (snk_ready) begin
                     next_state = IDLE;
-                    if (rst)
-                        next_state = CLRD;
+                    if (sync)
+                        next_state = SYNC;
                     if (|fires)
                         next_state = SPKS;
+                    if (rst)
+                        next_state = CLRD;
                 end
+            end
+            CLRD: begin
+                if (snk_ready)
+                    next_state = IDLE;
+                    if (sync)
+                        next_state = SYNC;
+                    if (|fires)
+                        next_state = SPKS;
             end
             SPKS: begin
                 if (snk_ready) begin
                     next_state = IDLE;
-                    if (rst)
-                        next_state = CLRD;
+                    if (sync)
+                        next_state = SYNC;
                     if (fire_counter > 1)
                         next_state = SPKS;
                 end
             end
-            CLRD: begin
+            SYNC: begin
                 if (snk_ready)
                     next_state = IDLE;
             end

@@ -31,19 +31,18 @@ module network_source #(
     input logic [PKT_WIDTH-1:0] src,
     // network handshake signals
     input logic net_ready,
-    output logic net_valid,
+    output logic lnk_valid,
     output logic net_sync,
     // network signals
     output logic net_arstn,
+    output logic net_en,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
     import stream_config::*;
     import source_config::*;
 
-    assign net_valid = src_valid;
     assign src_ready = net_ready;
-
-    assign net_sync = src[PKT_WIDTH - SNC - 1];
+    assign net_sync = src_valid ? src[PKT_WIDTH - SNC - 1] : 0;
 
     // "Now watch this (half-clock) drive!"
     logic rst_p, rst_n;
@@ -62,6 +61,8 @@ module network_source #(
     // net_arstn is asserted low when artsn is low
     // or for the half-clock when rst_p is asserted and rst_n is not asserted
     assign net_arstn = (arstn == 0) ? 0 : !(rst_p && !rst_n);
+
+    assign net_en = src_valid && net_ready;
 
     always_comb begin: calc_net_inp
         for (int i = 0; i < NUM_INP; i++)

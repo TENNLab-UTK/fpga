@@ -270,11 +270,13 @@ class Processor(neuro.Processor):
         ]
 
     def run(self, time: int) -> None:
-        rx_thread = Thread(target=self._hw_rx, args=(time,))
+        if time < 1:
+            raise ValueError("It's not possible to run for less than 1 timestep")
+        target_time = self._inp.time + time
+        rx_thread = Thread(target=self._hw_rx, args=(target_time - 1,))
         rx_thread.daemon = True
         rx_thread.start()
         self._last_run = self._inp.time
-        target_time = self._inp.time + time
         while self._inp.time < target_time:
             spikes = []
             while self._inp.queue and int(self._inp.queue[0].time) == self._inp.time:
@@ -294,28 +296,24 @@ class Processor(neuro.Processor):
                 spikes = []
         rx_thread.join()
 
-    def _hw_rx(self, runs: int, seek_clr: bool = False) -> None:
+    def _hw_rx(self, target: int, seek_clr: bool = False) -> None:
         num_rx_bytes = width_bits_to_bytes(self._out.spk_fmt.calcsize())
-        target = self._out.time + runs - 1
-        seek_spks = False
 
         while True:
             while self._out.time == self._inp.time and not seek_clr:
                 sleep(100e-9)
             rx = self._interface.read(
                 num_rx_bytes,
-                1000.0 * self._secs_per_run * (target - self._out.time),
+                1000.0 * self._secs_per_run * max(1, target - self._out.time),
             )[::-1]
             if len(rx) != num_rx_bytes:
-                if not seek_spks:
-                    raise RuntimeError("Did not receive coherent response from target.")
-                break
+                raise RuntimeError("Did not receive coherent response from target.")
 
             match self._out.type:
                 case IoType.DISPATCH:
                     out_dict = self._out.spk_fmt.unpack(rx)
                     match out_dict["opcode"]:
-                        case DispatchOpcode.RUN | DispatchOpcode.SNC:
+                        case DispatchOpcode.RUN:
                             ran = self._out.cmd_fmt.unpack(rx)["operand"]
                             self._out.time += ran
                         case DispatchOpcode.SPK:
@@ -326,6 +324,12 @@ class Processor(neuro.Processor):
                                 else 0
                             )
                             self._out.queue[out_idx].append(float(self._out.time))
+                        case DispatchOpcode.SNC:
+                            if self._out.time != target:
+                                raise RuntimeError(
+                                    f"SNC received off time {self._out.time}/{target}"
+                                )
+                            break
                         case DispatchOpcode.CLR:
                             if seek_clr:
                                 return
@@ -337,19 +341,6 @@ class Processor(neuro.Processor):
                                 self._out.clear()
                         case _:
                             raise ValueError()
-                    if (
-                        (out_dict["opcode"] == DispatchOpcode.SNC)
-                        and (self._out.time < target)
-                    ) or (
-                        (out_dict["opcode"] == DispatchOpcode.RUN)
-                        and (self._out.time == target)
-                    ):
-                        raise RuntimeError(
-                            f"Opcode {DispatchOpcode(out_dict['opcode']).name}"
-                            f" does NOT match timing {self._out.time}/{target}"
-                        )
-                    elif out_dict["opcode"] == DispatchOpcode.SNC:
-                        seek_spks = True
 
                 case IoType.STREAM:
                     out_dict = self._out.spk_fmt.unpack(rx)
@@ -369,7 +360,9 @@ class Processor(neuro.Processor):
                     elif out_dict[StreamFlag.SNC.name]:
                         break
 
-    def _hw_tx(self, spikes: Iterable[neuro.Spike], runs: int, sync: bool) -> None:
+    def _hw_tx(
+        self, spikes: Iterable[neuro.Spike], runs: int, sync: bool = False
+    ) -> None:
         spike_dict = {
             self._network.get_node(s.id).input_id: int(
                 s.value * spike_value_factor(self._network)
@@ -401,14 +394,21 @@ class Processor(neuro.Processor):
                     self._interface.write(
                         self._inp.cmd_fmt.pack(
                             {
-                                "opcode": (
-                                    DispatchOpcode.SNC if sync else DispatchOpcode.RUN
-                                ),
+                                "opcode": DispatchOpcode.RUN,
                                 "operand": runs,
                             }
                         )[::-1]
                     )
                     pause(runs)
+                if sync:
+                    self._interface.write(
+                        self._inp.cmd_fmt.pack(
+                            {
+                                "opcode": DispatchOpcode.SNC,
+                                "operand": 0,
+                            }
+                        )
+                    )
 
             case IoType.STREAM:
                 if not runs:
