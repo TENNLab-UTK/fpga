@@ -8,9 +8,11 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
+`include "macros.svh"
+
 package processor_config;
-    parameter int INP_WIDTH = source_config::PFX_WIDTH + source_config::SPK_WIDTH;
-    parameter int OUT_WIDTH = sink_config::PFX_WIDTH + sink_config::SPK_WIDTH;
+    parameter int INP_WIDTH = source_config::PFX_WIDTH + `max(source_config::SPK_WIDTH, 1);
+    parameter int OUT_WIDTH = sink_config::PFX_WIDTH + `max(sink_config::SPK_WIDTH, 1);
 endpackage
 
 // This processor is a simple example that may be useful when two conditions are met:
