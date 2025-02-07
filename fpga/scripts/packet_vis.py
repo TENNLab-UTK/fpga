@@ -23,7 +23,6 @@ from dash import (
 from neuro import Network
 from waitress import serve
 
-import fpga._processor
 from fpga._math import (
     bools_to_signed,
     bools_to_unsigned,
@@ -32,12 +31,7 @@ from fpga._math import (
     unsigned_width,
     width_padding_to_byte,
 )
-from fpga._processor import (
-    DispatchOpcode,
-    IoType,
-    dispatch_operand_widths,
-    opcode_width,
-)
+from fpga._processor import DispatchOpcode, IoType, StreamFlag, dispatch_operand_widths
 from fpga.network import charge_width, proc_params_dict
 
 
@@ -45,12 +39,27 @@ def io_type(io_type_str):
     return getattr(IoType, io_type_str.upper())
 
 
-def opcode_type(source_type_str):
-    return getattr(fpga._processor, source_type_str + "Opcode")
+def prefix_type(io_type_str: str):
+    io_t = io_type(io_type_str)
+    match io_t:
+        case IoType.DISPATCH:
+            return DispatchOpcode
+        case IoType.STREAM:
+            return StreamFlag
+        case _:
+            raise ValueError()
 
 
-def opcode(opc_type, opcode_str):
-    return getattr(opc_type, opcode_str.upper())
+def is_flag(pfx_t: type):
+    return "flag" in pfx_t.__name__.lower()
+
+
+def prefix_width(pfx_t: type):
+    return len(pfx_t) if is_flag(pfx_t) else unsigned_width(len(pfx_t) - 1)
+
+
+def prefix(pfx_t, pfx_str):
+    return getattr(pfx_t, pfx_str.upper())
 
 
 app = Dash(
@@ -310,109 +319,106 @@ def update_interface_options(interfaces_value):
     return interfaces_options, interfaces_value
 
 
-@callback(
-    Output("source_table", "children"),
-    Input("source_type", "value"),
-)
-def update_opcode_table(source_type_str):
-    opc_type = opcode_type(source_type_str)
-    opc_width = opcode_width(opc_type)
+def update_prefix_table(io_label: str, io_type_str: str):
+    pfx_t = prefix_type(io_type_str)
+    pfx_width = prefix_width(pfx_t)
 
-    rows = [
-        [html.Th("Opcode", colSpan=opc_width)],
-        [
-            html.Td(
-                dbc.Select(
-                    id={"type": "opcode"},
-                    options=opc_type._member_names_,
-                ),
-                colSpan=opc_width,
-            )
-        ],
-    ]
+    rows = [[html.Th("Flags" if is_flag(pfx_t) else "Opcode", colSpan=pfx_width)]]
+    if is_flag(pfx_t):
+        rows.append([html.Td(flg_name) for flg_name in pfx_t._member_names_])
+    else:
+        rows.append(
+            [
+                html.Td(
+                    dbc.Select(
+                        id={"type": io_label + "_opcode"},
+                        options=pfx_t._member_names_,
+                    ),
+                    colSpan=pfx_width,
+                )
+            ]
+        )
 
     rows.append(
         [
             html.Td(
                 dbc.Switch(
-                    id={"type": "opcode_switch", "index": idx},
+                    id={
+                        "type": io_label
+                        # we change the switch type to avoid callbacks on flag changes
+                        + ("_flag" if is_flag(pfx_t) else "_opcode") + "_switch",
+                        "index": idx,
+                    },
                     value=False,
                     disabled=False,
                 )
             )
-            for idx in range(opc_width)
+            for idx in range(pfx_width)
         ]
     )
     return [
         html.Tbody(
             [html.Thead(row) if row == 0 else html.Tr(row) for row in rows],
-            id={"type": "source_table_body"},
+            id={"type": io_label + "_table_body"},
         )
     ]
 
 
-@callback(
-    Output({"type": "opcode"}, "value"),
-    Output({"type": "opcode_switch", "index": ALL}, "value"),
-    Input({"type": "opcode"}, "value"),
-    Input({"type": "opcode_switch", "index": ALL}, "value"),
-    State("source_type", "value"),
-)
-def update_opcode(opcode_str, bit_switches, source_type_str):
-    opc_type = opcode_type(source_type_str)
-    opc_width = opcode_width(opc_type)
+def update_opcode(
+    ctx, opcode_str: str, bit_switches: list[bool], io_type_str: str
+) -> tuple[str, list[bool]]:
+    pfx_t = prefix_type(io_type_str)
+    pfx_width = prefix_width(pfx_t)
     # set opc to opcode based on whether triggered by select or switches
-    if ctx.triggered_id and ctx.triggered_id["type"] == "opcode":
-        return no_update, unsigned_to_bools(
-            opcode(opc_type, opcode_str).value, opc_width
-        )
+    if ctx.triggered_id and "switch" not in ctx.triggered_id["type"]:
+        return no_update, unsigned_to_bools(prefix(pfx_t, opcode_str).value, pfx_width)
     else:
-        return opc_type(
+        return pfx_t(
             bools_to_unsigned(bit_switches),
         ).name, [
             no_update
         ] * len(bit_switches)
 
 
-@callback(
-    Output({"type": "source_table_body"}, "children"),
-    Input({"type": "opcode"}, "value"),
-    Input("interfaces", "value"),
-    Input("num_inp", "value"),
-    Input("charge_width", "value"),
-    State("source_type", "value"),
-    # need the old body to get lengths of rows, etc.
-    State({"type": "source_table_body"}, "children"),
-)
 def update_operand_table(
-    opcode_str, interfaces, net_num_inp, proc_charge_width, source_type_str, old_body
+    io_label: str,
+    bit_switches: list[bool],
+    interfaces: list[str],
+    net_num_io: int,
+    charge_width: int,
+    io_type_str: str,
+    old_body,
 ):
-    inp_type = io_type(source_type_str)
-    opc_type = opcode_type(source_type_str)
-    opc_width = opcode_width(opc_type)
+    io_t = io_type(io_type_str)
+    pfx_t = prefix_type(io_type_str)
+    pfx_width = prefix_width(pfx_t)
 
     body = Patch()
     # NOTE: looping backward is required to avoid skipping indices to delete
     for i in range(len(old_body[0]["props"]["children"]) - 1, 0, -1):
         del body[0]["props"]["children"][i]
-    for i in range(len(old_body[1]["props"]["children"]) - 1, 0, -1):
+    for i in range(
+        len(old_body[1]["props"]["children"]) - 1,
+        pfx_width - 1 if is_flag(pfx_t) else 0,
+        -1,
+    ):
         del body[1]["props"]["children"][i]
-    for i in range(len(old_body[2]["props"]["children"]) - 1, opc_width - 1, -1):
+    for i in range(len(old_body[2]["props"]["children"]) - 1, pfx_width - 1, -1):
         del body[2]["props"]["children"][i]
 
     # NOTE: source table callback restores operand defaults when source type changes
-    match inp_type:
+    match io_t:
         case IoType.DISPATCH:
             idx_width, operand_width = dispatch_operand_widths(
-                net_num_inp, proc_charge_width, "AXI Stream" in interfaces
+                pfx_width, net_num_io, charge_width, "AXI Stream" in interfaces
             )
             padding = (
-                width_padding_to_byte(opc_width + idx_width + proc_charge_width)
+                width_padding_to_byte(pfx_width + idx_width + charge_width)
                 if "AXI Stream" in interfaces
                 else 0
             )
-            match opcode(opc_type, opcode_str):
-                case DispatchOpcode.NOP | DispatchOpcode.CLR:
+            match pfx_t(bools_to_unsigned(bit_switches)):
+                case DispatchOpcode.SNC | DispatchOpcode.CLR:
                     body[0]["props"]["children"].append(
                         html.Th("Padding", colSpan=operand_width)
                     )
@@ -421,7 +427,10 @@ def update_operand_table(
                         [
                             html.Td(
                                 dbc.Switch(
-                                    id={"type": "operand_switch", "index": i},
+                                    id={
+                                        "type": io_label + "_operand_switch",
+                                        "index": i,
+                                    },
                                     value=False,
                                     disabled=True,
                                 )
@@ -433,38 +442,42 @@ def update_operand_table(
                 case DispatchOpcode.SPK:
                     if idx_width:
                         body[0]["props"]["children"].append(
-                            html.Th("Input", colSpan=idx_width)
+                            html.Th("Index", colSpan=idx_width)
                         )
                         body[1]["props"]["children"].append(
                             html.Td(
                                 dbc.Input(
-                                    id={"type": "operand", "index": 0},
+                                    id={"type": io_label + "_operand", "index": 0},
                                     type="number",
                                     inputMode="numeric",
                                     value=0,
                                     min=0,
-                                    max=net_num_inp - 1,
+                                    max=net_num_io - 1,
                                 ),
                                 colSpan=idx_width,
                             )
                         )
 
-                    body[0]["props"]["children"].append(
-                        html.Th("Charge", colSpan=proc_charge_width)
-                    )
-                    body[1]["props"]["children"].append(
-                        html.Td(
-                            dbc.Input(
-                                id={"type": "operand", "index": int(idx_width > 0)},
-                                type="number",
-                                inputMode="numeric",
-                                value=0,
-                                min=-(2 ** (proc_charge_width - 1)),
-                                max=(2 ** (proc_charge_width - 1)) - 1,
-                            ),
-                            colSpan=proc_charge_width,
+                    if charge_width:
+                        body[0]["props"]["children"].append(
+                            html.Th("Charge", colSpan=charge_width)
                         )
-                    )
+                        body[1]["props"]["children"].append(
+                            html.Td(
+                                dbc.Input(
+                                    id={
+                                        "type": io_label + "_operand",
+                                        "index": int(idx_width > 0),
+                                    },
+                                    type="number",
+                                    inputMode="numeric",
+                                    value=0,
+                                    min=-(2 ** (charge_width - 1)),
+                                    max=(2 ** (charge_width - 1)) - 1,
+                                ),
+                                colSpan=charge_width,
+                            )
+                        )
 
                     if padding:
                         body[0]["props"]["children"].append(
@@ -476,7 +489,10 @@ def update_operand_table(
                         [
                             html.Td(
                                 dbc.Switch(
-                                    id={"type": "operand_switch", "index": i},
+                                    id={
+                                        "type": io_label + "_operand_switch",
+                                        "index": i,
+                                    },
                                     value=False,
                                     disabled=(i >= (operand_width - padding)),
                                 )
@@ -492,11 +508,11 @@ def update_operand_table(
                     body[1]["props"]["children"].append(
                         html.Td(
                             dbc.Input(
-                                id={"type": "operand", "index": 0},
+                                id={"type": io_label + "_operand", "index": 0},
                                 type="number",
                                 inputMode="numeric",
-                                value=1,
-                                min=1,
+                                value=0,
+                                min=0,
                                 max=2**operand_width - 1,
                             ),
                             colSpan=operand_width,
@@ -506,7 +522,10 @@ def update_operand_table(
                         [
                             html.Td(
                                 dbc.Switch(
-                                    id={"type": "operand_switch", "index": i},
+                                    id={
+                                        "type": io_label + "_operand_switch",
+                                        "index": i,
+                                    },
                                     value=False,
                                     disabled=False,
                                 )
@@ -519,29 +538,34 @@ def update_operand_table(
                     raise ValueError()
 
         case IoType.STREAM:
-            spk_width = net_num_inp * proc_charge_width
+            spk_width = net_num_io * max(charge_width, 1)
             padding = (
-                width_padding_to_byte(opc_width + spk_width)
+                width_padding_to_byte(pfx_width + spk_width)
                 if "AXI Stream" in interfaces
                 else 0
             )
 
-            for inp in range(net_num_inp):
+            for inp in range(net_num_io):
                 body[0]["props"]["children"].append(
-                    html.Th(f"Input {inp} Charge", colSpan=proc_charge_width)
+                    html.Th(
+                        f"Index {inp} " + ("Charge" if charge_width else "Fire"),
+                        colSpan=max(charge_width, 1),
+                    )
                 )
                 body[1]["props"]["children"].append(
                     html.Td(
                         dbc.Input(
-                            id={"type": "operand", "index": inp},
+                            id={"type": io_label + "_operand", "index": inp},
                             type="number",
                             inputMode="numeric",
                             value=0,
-                            min=-(2 ** (proc_charge_width - 1)),
-                            max=(2 ** (proc_charge_width - 1)) - 1,
+                            min=-(2 ** (charge_width - 1)),
+                            max=(2 ** (charge_width - 1)) - 1,
                         ),
-                        colSpan=proc_charge_width,
+                        colSpan=charge_width,
                     )
+                    if charge_width
+                    else html.Td()
                 )
 
             if padding:
@@ -552,7 +576,7 @@ def update_operand_table(
                 [
                     html.Td(
                         dbc.Switch(
-                            id={"type": "operand_switch", "index": i},
+                            id={"type": io_label + "_operand_switch", "index": i},
                             value=False,
                             disabled=(i >= spk_width),
                         )
@@ -567,74 +591,70 @@ def update_operand_table(
     return body
 
 
-@callback(
-    Output({"type": "operand", "index": ALL}, "value"),
-    Output({"type": "operand_switch", "index": ALL}, "value"),
-    Input({"type": "operand", "index": ALL}, "value"),
-    Input({"type": "operand_switch", "index": ALL}, "value"),
-    State({"type": "opcode"}, "value"),
-    State("interfaces", "value"),
-    State("source_type", "value"),
-    State("num_inp", "value"),
-    State("charge_width", "value"),
-)
 def update_operand(
-    operands,
-    bit_switches,
-    opcode_str,
-    interfaces,
-    source_type_str,
-    net_num_inp,
-    proc_charge_width,
+    ctx,
+    operands: list,
+    bit_switches: list[bool],
+    opc_switches: list[bool],
+    interfaces: list[str],
+    io_type_str: str,
+    net_num_io,
+    charge_width,
 ):
-    if ctx.triggered_id and ctx.triggered_id["type"] == "operand" and None in operands:
+    if (
+        ctx.triggered_id
+        and "switch" not in ctx.triggered_id["type"]
+        and None in operands
+    ):
         # value between changes
         return [no_update] * len(operands), [no_update] * len(bit_switches)
 
-    inp_type = io_type(source_type_str)
-    opc_type = opcode_type(source_type_str)
-    opc_width = opcode_width(opc_type)
+    inp_type = io_type(io_type_str)
+    pfx_t = prefix_type(io_type_str)
+    pfx_width = prefix_width(pfx_t)
 
     match inp_type:
         case IoType.DISPATCH:
             idx_width, operand_width = dispatch_operand_widths(
-                net_num_inp, proc_charge_width, "AXI Stream" in interfaces
+                pfx_width, net_num_io, charge_width, "AXI Stream" in interfaces
             )
             padding = (
-                width_padding_to_byte(opc_width + idx_width + proc_charge_width)
+                width_padding_to_byte(pfx_width + idx_width + charge_width)
                 if "AXI Stream" in interfaces
                 else 0
             )
-            match opcode(opc_type, opcode_str):
-                case DispatchOpcode.NOP | DispatchOpcode.CLR:
+            match pfx_t(bools_to_unsigned(opc_switches)):
+                case DispatchOpcode.SNC | DispatchOpcode.CLR:
                     return [no_update] * len(operands), [no_update] * len(bit_switches)
                 case DispatchOpcode.SPK:
-                    if ctx.triggered_id and ctx.triggered_id["type"] == "operand":
+                    if ctx.triggered_id and "switch" not in ctx.triggered_id["type"]:
                         if idx_width:
                             bit_switches[:idx_width] = unsigned_to_bools(
                                 operands[0], idx_width
                             )
-                        bit_switches[idx_width : idx_width + proc_charge_width] = (
-                            signed_to_bools(
-                                operands[int(idx_width > 0)], proc_charge_width
+                        if charge_width:
+                            bit_switches[idx_width : idx_width + charge_width] = (
+                                signed_to_bools(
+                                    operands[int(idx_width > 0)], charge_width
+                                )
                             )
-                        )
                         return [no_update] * len(operands), bit_switches
                     else:
                         if idx_width:
                             operands[0] = bools_to_unsigned(bit_switches[:idx_width])
-                        operands[int(idx_width > 0)] = bools_to_signed(
-                            bit_switches[idx_width : idx_width + proc_charge_width]
-                        )
+                        if charge_width:
+                            operands[int(idx_width > 0)] = bools_to_signed(
+                                bit_switches[idx_width : idx_width + charge_width]
+                            )
                         return operands, [no_update] * len(bit_switches)
 
                 case DispatchOpcode.RUN:
-                    if ctx.triggered_id and ctx.triggered_id["type"] == "operand":
+                    if ctx.triggered_id and "switch" not in ctx.triggered_id["type"]:
                         return [no_update], unsigned_to_bools(
                             operands[0], operand_width
                         )
                     else:
-                        return [max(bools_to_unsigned(bit_switches), 1)], [
+                        return [bools_to_unsigned(bit_switches)], [
                             no_update
                         ] * operand_width
 
@@ -642,31 +662,33 @@ def update_operand(
                     raise ValueError()
 
         case IoType.STREAM:
-            spk_width = net_num_inp * proc_charge_width
+            spk_width = net_num_io * max(charge_width, 1)
             padding = (
-                width_padding_to_byte(opc_width + spk_width)
+                width_padding_to_byte(pfx_width + spk_width)
                 if "AXI Stream" in interfaces
                 else 0
             )
 
-            if ctx.triggered_id and ctx.triggered_id["type"] == "operand":
-                for inp in range(net_num_inp):
-                    bit_switches[
-                        inp * proc_charge_width : (inp + 1) * proc_charge_width
-                    ] = signed_to_bools(operands[inp], proc_charge_width)
+            if ctx.triggered_id and "switch" not in ctx.triggered_id["type"]:
+                if charge_width:
+                    for inp in range(net_num_io):
+                        bit_switches[inp * charge_width : (inp + 1) * charge_width] = (
+                            signed_to_bools(operands[inp], charge_width)
+                        )
                 return [no_update] * len(operands), bit_switches
             else:
                 operands = []
-                [
-                    operands.append(
-                        bools_to_signed(
-                            bit_switches[
-                                inp * proc_charge_width : (inp + 1) * proc_charge_width
-                            ]
+                if charge_width:
+                    [
+                        operands.append(
+                            bools_to_signed(
+                                bit_switches[
+                                    inp * charge_width : (inp + 1) * charge_width
+                                ]
+                            )
                         )
-                    )
-                    for inp in range(net_num_inp)
-                ]
+                        for inp in range(net_num_io)
+                    ]
                 return operands, [no_update] * (spk_width + padding)
 
         case _:
@@ -674,122 +696,150 @@ def update_operand(
 
 
 @callback(
-    Output("sink_table", "children"),
-    Input("interfaces", "value"),
-    Input("sink_type", "value"),
-    Input("num_out", "value"),
+    Output("source_table", "children"),
+    Input("source_type", "value"),
 )
-def update_sink_table(interfaces, sink_type_str, net_num_out):
-    if net_num_out is None:
-        # value between changes
-        return no_update
-
-    out_type = io_type(sink_type_str)
-
-    rows = [[], []]
-
-    match out_type:
-        case IoType.DISPATCH:
-            idx_width = unsigned_width(net_num_out)
-            padding = (
-                width_padding_to_byte(idx_width) if "AXI Stream" in interfaces else 0
-            )
-            rows[0].append(
-                html.Th(f"Number of Fires, Output Index Fired", colSpan=idx_width)
-            )
-            [
-                rows[1].append(
-                    html.Td(
-                        dbc.Switch(
-                            id={"type": "out_switch", "index": out},
-                            value=False,
-                            disabled=False,
-                        )
-                    )
-                )
-                for out in range(idx_width)
-            ]
-            rows.extend(
-                [
-                    [
-                        html.Td(
-                            dbc.Input(
-                                id={"type": "out_idx"},
-                                type="number",
-                                inputMode="numeric",
-                                value=0,
-                                min=0,
-                                max=net_num_out,
-                            ),
-                            colSpan=idx_width,
-                        )
-                    ]
-                    + [html.Td() for _ in range(padding)]
-                ]
-            )
-
-        case IoType.STREAM:
-            padding = (
-                width_padding_to_byte(net_num_out) if "AXI Stream" in interfaces else 0
-            )
-
-            [
-                rows[0].append(html.Th(f"Output {out} Fire"))
-                for out in range(net_num_out)
-            ]
-            [
-                rows[1].append(
-                    html.Td(
-                        dbc.Switch(
-                            id={"type": "fire_switch", "index": out},
-                            value=False,
-                            disabled=False,
-                        )
-                    )
-                )
-                for out in range(net_num_out)
-            ]
-
-        case _:
-            raise ValueError()
-
-    if padding:
-        rows[0].append(html.Th("Padding", colSpan=padding))
-        [
-            rows[1].append(
-                html.Td(
-                    dbc.Switch(
-                        id={"type": "fire_switch", "index": out},
-                        value=False,
-                        disabled=True,
-                    )
-                )
-            )
-            for out in range(padding)
-        ]
-
-    return [
-        html.Tbody(
-            [html.Thead(row) if row == 0 else html.Tr(row) for row in rows],
-            id={"type": "sink_table_body"},
-        )
-    ]
+def update_source_prefix_table(source_type_str):
+    return update_prefix_table("source", source_type_str)
 
 
 @callback(
-    Output({"type": "out_idx"}, "value"),
-    Output({"type": "out_switch", "index": ALL}, "value"),
-    Input({"type": "out_idx"}, "value"),
-    Input({"type": "out_switch", "index": ALL}, "value"),
+    Output({"type": "source_opcode"}, "value"),
+    Output({"type": "source_opcode_switch", "index": ALL}, "value"),
+    Input({"type": "source_opcode"}, "value"),
+    Input({"type": "source_opcode_switch", "index": ALL}, "value"),
+    State("source_type", "value"),
 )
-def update_output(out_idx, bit_switches):
-    if ctx.triggered_id and ctx.triggered_id["type"] == "out_idx":
-        if out_idx is None:
-            # value between changes
-            return no_update, [no_update] * len(bit_switches)
-        return no_update, unsigned_to_bools(out_idx, len(bit_switches))
-    else:
-        return bools_to_unsigned(bit_switches), [no_update] * len(bit_switches)
+def update_source_opcode(opcode_str, bit_switches, source_type_str):
+    return update_opcode(ctx, opcode_str, bit_switches, source_type_str)
+
+
+@callback(
+    Output({"type": "source_table_body"}, "children"),
+    Input({"type": "source_opcode_switch", "index": ALL}, "value"),
+    Input("interfaces", "value"),
+    Input("num_inp", "value"),
+    Input("charge_width", "value"),
+    State("source_type", "value"),
+    # need the old body to get lengths of rows, etc.
+    State({"type": "source_table_body"}, "children"),
+)
+def update_source_operand_table(
+    bit_switches, interfaces, net_num_inp, proc_charge_width, source_type_str, old_body
+):
+    return update_operand_table(
+        "source",
+        bit_switches,
+        interfaces,
+        net_num_inp,
+        proc_charge_width,
+        source_type_str,
+        old_body,
+    )
+
+
+@callback(
+    Output({"type": "source_operand", "index": ALL}, "value"),
+    Output({"type": "source_operand_switch", "index": ALL}, "value"),
+    Input({"type": "source_operand", "index": ALL}, "value"),
+    Input({"type": "source_operand_switch", "index": ALL}, "value"),
+    State({"type": "source_opcode_switch", "index": ALL}, "value"),
+    State("interfaces", "value"),
+    State("source_type", "value"),
+    State("num_inp", "value"),
+    State("charge_width", "value"),
+)
+def update_source_operand(
+    operands,
+    bit_switches,
+    opc_switches,
+    interfaces,
+    source_type_str,
+    net_num_inp,
+    proc_charge_width,
+):
+    return update_operand(
+        ctx,
+        operands,
+        bit_switches,
+        opc_switches,
+        interfaces,
+        source_type_str,
+        net_num_inp,
+        proc_charge_width,
+    )
+
+
+@callback(
+    Output("sink_table", "children"),
+    Input("sink_type", "value"),
+)
+def update_sink_prefix_table(sink_type_str):
+    return update_prefix_table("sink", sink_type_str)
+
+
+@callback(
+    Output({"type": "sink_opcode"}, "value"),
+    Output({"type": "sink_opcode_switch", "index": ALL}, "value"),
+    Input({"type": "sink_opcode"}, "value"),
+    Input({"type": "sink_opcode_switch", "index": ALL}, "value"),
+    State("sink_type", "value"),
+)
+def update_sink_opcode(opcode_str, bit_switches, sink_type_str):
+    return update_opcode(ctx, opcode_str, bit_switches, sink_type_str)
+
+
+@callback(
+    Output({"type": "sink_table_body"}, "children"),
+    Input({"type": "sink_opcode_switch", "index": ALL}, "value"),
+    Input("interfaces", "value"),
+    Input("num_out", "value"),
+    State("sink_type", "value"),
+    # need the old body to get lengths of rows, etc.
+    State({"type": "sink_table_body"}, "children"),
+)
+def update_sink_operand_table(
+    bit_switches, interfaces, net_num_out, sink_type_str, old_body
+):
+    return update_operand_table(
+        "sink",
+        bit_switches,
+        interfaces,
+        net_num_out,
+        0,
+        sink_type_str,
+        old_body,
+    )
+
+
+@callback(
+    Output({"type": "sink_operand", "index": ALL}, "value"),
+    Output({"type": "sink_operand_switch", "index": ALL}, "value"),
+    Input({"type": "sink_operand", "index": ALL}, "value"),
+    Input({"type": "sink_operand_switch", "index": ALL}, "value"),
+    State({"type": "sink_opcode_switch", "index": ALL}, "value"),
+    State("interfaces", "value"),
+    State("sink_type", "value"),
+    State("num_out", "value"),
+)
+def update_sink_operand(
+    operands,
+    bit_switches,
+    opc_switches,
+    interfaces,
+    sink_type_str,
+    net_num_out,
+):
+    return update_operand(
+        ctx,
+        operands,
+        bit_switches,
+        opc_switches,
+        interfaces,
+        sink_type_str,
+        net_num_out,
+        0,
+    )
 
 
 def main():
