@@ -11,7 +11,6 @@
 `include "macros.svh"
 
 package sink_config;
-    export *::*;
     import network_config::*;
     import stream_config::*;
     localparam int PFX_WIDTH = NUM_FLG;
@@ -37,6 +36,7 @@ module network_sink #(
     // sink output
     output logic [PKT_WIDTH-1:0] snk
 );
+    import network_config::*;
     import stream_config::*;
     import sink_config::*;
 

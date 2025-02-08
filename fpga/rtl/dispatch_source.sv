@@ -11,7 +11,6 @@
 `include "macros.svh"
 
 package source_config;
-    export *::*;
     import network_config::*;
     import dispatch_config::*;
     localparam int PFX_WIDTH = $clog2(NUM_OPC);
@@ -38,6 +37,7 @@ module network_source #(
     output logic net_en,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
+    import network_config::*;
     import dispatch_config::*;
     import source_config::*;
     localparam int RUN_WIDTH = PKT_WIDTH - PFX_WIDTH;

@@ -9,7 +9,6 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
 package sink_config;
-    export *::*;
     import network_config::*;
     import dispatch_config::*;
 
@@ -37,6 +36,7 @@ module network_sink #(
     // sink output
     output logic [PKT_WIDTH-1:0] snk
 );
+    import network_config::*;
     import dispatch_config::*;
     import sink_config::*;
 

@@ -24,12 +24,6 @@ package dispatch_config;
     localparam int NUM_OPC = 4;
 endpackage
 
-package procedure_config;
-    export *::*;
-    import dispatch_config::opcode_t;
-    localparam int NUM_OPC = 8;
-endpackage
-
 package stream_config;
     typedef enum {
         SNC = 0,
