@@ -485,7 +485,7 @@ class Processor(neuro.Processor):
                 }
                 for module in [
                     "axis_adapter",
-                    "axis_uart",
+                    "axis_fifo",
                 ]
             ]
         )
@@ -501,6 +501,7 @@ class Processor(neuro.Processor):
                     f"{self._out.type.name.lower()}_sink",
                     "network_arstn",
                     "axis_processor",
+                    "axis_uart",
                     "uart_processor",
                 ]
             ]
