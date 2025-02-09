@@ -218,9 +218,12 @@ class Processor(neuro.Processor):
     def clear_activity(self) -> None:
         if self._inp.type == IoType.DISPATCH:
             self._interface.write(
-                self._inp.cmd_fmt.pack({"opcode": DispatchOpcode.CLR, "operand": 0})[
-                    ::-1
-                ]
+                self._inp.cmd_fmt.pack(
+                    {
+                        "opcode": DispatchOpcode.CLR,
+                        "operand": 0,
+                    }
+                )[::-1]
             )
         self._interface.flush()
         match (self._inp.type, self._out.type):
@@ -415,7 +418,7 @@ class Processor(neuro.Processor):
                                 "opcode": DispatchOpcode.SNC,
                                 "operand": 0,
                             }
-                        )
+                        )[::-1]
                     )
 
             case IoType.STREAM:
