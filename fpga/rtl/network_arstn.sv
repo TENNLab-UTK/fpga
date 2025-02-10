@@ -26,6 +26,6 @@ module network_arstn (
     end
 
     // net_arstn asserted low for half clock when net_clear asserted
-    // or whenever net_arstn asserted low of course
+    // or whenever global arstn asserted low of course
     assign net_arstn = arstn && !(net_clear && !clear_mask);
 endmodule
