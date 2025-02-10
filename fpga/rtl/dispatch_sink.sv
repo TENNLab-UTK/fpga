@@ -173,12 +173,13 @@ module network_sink #(
                 end
             end
             CLRD: begin
-                if (snk_ready)
+                if (snk_ready) begin
                     next_state = IDLE;
                     if (sync)
                         next_state = SYNC;
                     if (|fires)
                         next_state = SPKS;
+                end
             end
             SPKS: begin
                 if (snk_ready) begin
