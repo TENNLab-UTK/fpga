@@ -23,12 +23,11 @@ module network_sink #(
     // global inputs
     input logic clk,
     input logic arstn,
-    // network handshake signals
-    input logic net_sync,
-    output logic net_ready,
     // network signals
-    input logic net_arstn,
-    input logic net_en,
+    input logic net_run,
+    input logic net_sync,
+    input logic net_clear,
+    output logic net_ready,
     input logic [network_config::NUM_OUT-1:0] net_out,
     // sink handshake signals
     input logic snk_ready,
@@ -45,17 +44,6 @@ module network_sink #(
 
     assign net_ready = (curr_state == IDLE);
 
-    logic rst; // latch set when net_arstn == 0, reset when clear dispatched
-
-    always_ff @(posedge clk or negedge arstn or negedge net_arstn) begin: set_rst
-        if (arstn == 0)
-            rst <= 0;
-        else if (net_arstn == 0)
-            rst <= 1;
-        else if (curr_state == CLRD && next_state != CLRD)
-            rst <= 0;
-    end
-
     localparam int RUN_WIDTH = PKT_WIDTH - PFX_WIDTH;
     logic [RUN_WIDTH-1:0] run_counter, runs;
 
@@ -63,7 +51,7 @@ module network_sink #(
         if (arstn == 0) begin
             run_counter <= 0;
         end else begin
-            if (net_en)
+            if (net_run && net_ready)
                 run_counter <= run_counter + 1;
             else if (curr_state == RUNS && next_state != RUNS)
                 run_counter <= run_counter - runs;
@@ -85,7 +73,7 @@ module network_sink #(
         if (arstn == 0) begin
             fires <= 0;
         end else begin
-            if (net_en)
+            if (net_run && net_ready)
                 fires <= net_out;
             else if (curr_state == SPKS && next_state != SPKS)
                 fires <= 0;
@@ -115,6 +103,19 @@ module network_sink #(
                 sync <= net_sync;
             else if (curr_state == SYNC && next_state != SYNC)
                 sync <= 0;
+        end
+    end
+
+    logic clear;
+
+    always_ff @(posedge clk or negedge arstn) begin: set_clear
+        if (arstn == 0) begin
+            clear <= 0;
+        end else begin
+            if (curr_state == IDLE && next_state != IDLE)
+                clear <= net_clear;
+            else if (curr_state == CLRD && next_state != CLRD)
+                clear <= 0;
         end
     end
 
@@ -148,15 +149,16 @@ module network_sink #(
         next_state = curr_state;
         case (curr_state)
             IDLE: begin
+                // net_ready is high in this and only this state
                 if (net_sync)
                     next_state = SYNC;
-                if (net_en && |net_out)
+                if (net_run && |net_out)
                     next_state = SPKS;
-                if (rst)
+                if (net_clear)
                     next_state = CLRD;
                 if (&run_counter)
                     next_state = RUNS;
-                if (run_counter > 0 && (rst || (net_en && |net_out) || net_sync))
+                if (((net_run && |net_out) || net_sync || net_clear) && (run_counter > 0))
                     next_state = RUNS;
             end
             RUNS: begin
@@ -166,7 +168,7 @@ module network_sink #(
                         next_state = SYNC;
                     if (|fires)
                         next_state = SPKS;
-                    if (rst)
+                    if (clear)
                         next_state = CLRD;
                 end
             end

@@ -498,6 +498,7 @@ class Processor(neuro.Processor):
                     "io_configs",
                     f"{self._inp.type.name.lower()}_source",
                     f"{self._out.type.name.lower()}_sink",
+                    "network_arstn",
                     "axis_processor",
                     "uart_processor",
                 ]

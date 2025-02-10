@@ -29,12 +29,11 @@ module network_source #(
     output logic src_ready,
     // source input
     input logic [PKT_WIDTH-1:0] src,
-    // network handshake signals
-    input logic net_ready,
-    output logic net_sync,
     // network signals
-    output logic net_arstn,
-    output logic net_en,
+    input logic net_ready,
+    output logic net_run,
+    output logic net_sync,
+    output logic net_clear,
     output logic signed [network_config::CHARGE_WIDTH-1:0] net_inp [0:network_config::NUM_INP-1]
 );
     import network_config::*;
@@ -48,9 +47,9 @@ module network_source #(
     end
 
     logic [RUN_WIDTH-1:0] run_counter;
-    assign net_en = (run_counter > 0) && net_ready;
+    assign net_run = (run_counter > 0);
     // only ready for new dispatch when nothing to send or will be done sending this clk
-    assign src_ready = ((run_counter == 0) && !net_sync) || (run_counter <= 1 && net_ready);
+    assign src_ready = (run_counter <= 1 && net_ready) || ((run_counter == 0) && !net_sync && !net_clear);
 
     always_ff @(posedge clk or negedge arstn) begin: set_run_counter
         if (arstn == 0) begin
@@ -58,7 +57,7 @@ module network_source #(
         end else begin
             if (src_valid && src_ready && op == RUN) begin
                 run_counter <= src[(PKT_WIDTH - PFX_WIDTH - 1) : 0];
-            end else if (net_en) begin
+            end else if (net_run && net_ready) begin
                 run_counter <= run_counter - 1;
             end
         end
@@ -74,13 +73,13 @@ module network_source #(
         end
     end
 
-    always_ff @(posedge clk or negedge arstn) begin: set_net_arstn
+    always_ff @(posedge clk or negedge arstn) begin: set_net_clear
         if (arstn == 0) begin
-            net_arstn <= 0;
+            net_clear <= 0;
         end else if (src_valid && src_ready && op == CLR) begin
-            net_arstn <= 0;
-        end else begin
-            net_arstn <= 1;
+            net_clear <= 1;
+        end else if (net_ready) begin
+            net_clear <= 0;
         end
     end
 
@@ -100,7 +99,7 @@ module network_source #(
             for (int i = 0; i < NUM_INP; i++)
                 net_inp[i] <= 0;
         end else begin
-            if (net_en || (src_valid && src_ready && op == CLR)) begin
+            if (net_run && net_ready || (src_valid && src_ready && op == CLR)) begin
                 for (int i = 0; i < NUM_INP; i++)
                     net_inp[i] <= 0;
             end

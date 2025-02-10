@@ -26,30 +26,39 @@ module basic_processor (
     output logic [processor_config::OUT_WIDTH-1:0] out
 );
     import processor_config::*;
-    logic lnk_valid, net_ready, net_sync;
+    logic net_ready, net_run, net_sync, net_clear, net_arstn;
 
     network_source #(
         .PKT_WIDTH(INP_WIDTH)
     ) source (
-        .clk(clk),
-        .arstn(arstn),
+        .clk,
+        .arstn,
         .src_valid(1),
         .src(inp),
         .net_ready,
-        .net_sync
+        .net_run,
+        .net_sync,
+        .net_clear
+    );
+
+    network_arstn resetter (
+        .clk,
+        .arstn,
+        .net_clear,
+        .net_arstn
     );
 
     network net (
-        .clk(clk),
-        .arstn(source.net_arstn),
-        .en(source.net_en),
+        .clk,
+        .arstn(net_arstn),
+        .en(net_run && net_ready),
         .inp(source.net_inp)
     );
 
     network_sink sink #(
         .PKT_WIDTH(OUT_WIDTH)
     ) (
-        .clk(clk),
+        .clk,
         .arstn,
         .net_sync,
         .net_ready,
