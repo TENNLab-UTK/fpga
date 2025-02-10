@@ -55,15 +55,15 @@ module basic_processor (
         .inp(source.net_inp)
     );
 
-    network_sink sink #(
+    network_sink #(
         .PKT_WIDTH(OUT_WIDTH)
-    ) (
+    ) sink (
         .clk,
         .arstn,
+        .net_run,
         .net_sync,
         .net_ready,
-        .net_arstn(source.net_arstn),
-        .net_en(source.net_en),
+        .net_clear,
         .net_out(net.out),
         .snk_ready(1),
         .snk(out)
