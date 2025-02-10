@@ -241,6 +241,9 @@ class Processor(neuro.Processor):
         self._network = net
         self._setup_io()
         self._program_target()
+        # hardware will sometimes send CLR on startup
+        while self._interface.poll(1):
+            self._interface.read(self._interface.input_waiting())
         self.clear_activity()
 
     def output_count(self, out_idx: int) -> int:
