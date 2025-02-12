@@ -15,7 +15,7 @@ from threading import Thread
 from time import sleep
 from typing import Iterable
 
-import bitstruct as bs
+import bitstruct.c as bs
 import neuro
 from edalize.edatool import get_edatool
 from periphery import Serial
@@ -333,12 +333,7 @@ class Processor(neuro.Processor):
                             self._out.time += ran
                             [self._run_bytes_fifo.popleft() for _ in range(ran)]
                         case DispatchOpcode.SPK:
-                            out_idx = (
-                                out_dict["idx"]
-                                if len(self._out.spk_fmt._infos) > 1
-                                and self._out.spk_fmt._infos[1].name == "idx"
-                                else 0
-                            )
+                            out_idx = out_dict["idx"] if "idx" in out_dict else 0
                             self._out.queue[out_idx].append(float(self._out.time))
                         case DispatchOpcode.SNC:
                             break
@@ -630,7 +625,12 @@ class Processor(neuro.Processor):
             case IoType.DISPATCH:
                 # limited by both buffer size and command field width
                 self._max_run = min(
-                    2 ** (self._inp.cmd_fmt._infos[1].size) - 1,
+                    2
+                    ** (
+                        self._inp.cmd_fmt.calcsize()
+                        - unsigned_width(len(DispatchOpcode) - 1)
+                    )
+                    - 1,
                     self._max_run,
                 )
             case IoType.STREAM:
