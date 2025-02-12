@@ -253,6 +253,8 @@ class Processor(neuro.Processor):
     def load_network(self, net: neuro.Network) -> None:
         self.clear()
         self._network = net
+        # this lookup gets called frequently and neuro.Network is unhashable
+        self._spike_value_factor = spike_value_factor(self._network)
         self._setup_io()
         self._program_target()
         self.clear_activity()
@@ -376,7 +378,7 @@ class Processor(neuro.Processor):
     ) -> None:
         spike_dict = {
             self._network.get_node(s.id).input_id: int(
-                s.value * spike_value_factor(self._network)
+                s.value * self._spike_value_factor
             )
             for s in spikes
         }
