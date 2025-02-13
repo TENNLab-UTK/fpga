@@ -288,19 +288,11 @@ class Processor(neuro.Processor):
             while self._inp.queue and int(self._inp.queue[0].time) == self._inp.time:
                 spikes.append(self._inp.queue.popleft())
             run_time = int(self._inp.queue[0].time) if self._inp.queue else target_time
-            while self._inp.time < run_time:
-                num_runs = min(self._max_run, run_time - self._inp.time)
-                while (
-                    self._inp.time + num_runs - self._out.time
-                ) > self._max_runs_ahead:
-                    # TODO: magic timing will be resolved by buffers PR
-                    sleep(100e-9)
-                self._hw_tx(
-                    spikes,
-                    num_runs,
-                    (self._inp.time + num_runs == target_time),
-                )
-                spikes = []
+            self._hw_tx(
+                spikes,
+                run_time - self._inp.time,
+                (run_time == target_time),
+            )
         rx_thread.join()
 
     def _hw_rx(self, target: int, seek_clr: bool = False) -> None:
@@ -312,13 +304,11 @@ class Processor(neuro.Processor):
                 and self._out.time == self._inp.time
                 and not seek_clr
             ):
-                # TODO: magic timing will be resolved by buffers PR
                 sleep(100e-9)
                 continue
             rx = self._interface.read(
                 num_rx_bytes,
-                # TODO: magic timing will be resolved by buffers PR
-                10000.0 * self._secs_per_run * max(1, target - self._out.time),
+                10.0,
             )[::-1]
             if len(rx) != num_rx_bytes:
                 raise RuntimeError("Did not receive coherent response from target.")
@@ -404,16 +394,27 @@ class Processor(neuro.Processor):
                     )
                     for idx, val in spike_dict.items()
                 ]
-                if runs:
+                while runs:
+                    to_run = min(
+                        [
+                            runs,
+                            self._max_run,
+                            self._max_runs_ahead + self._out.time - self._inp.time,
+                        ]
+                    )
+                    if not to_run:
+                        sleep(100e-9)
+                        continue
                     self._interface.write(
                         self._inp.cmd_fmt.pack(
                             {
                                 "opcode": DispatchOpcode.RUN,
-                                "operand": runs,
+                                "operand": to_run,
                             }
                         )[::-1]
                     )
-                    pause(runs)
+                    pause(to_run)
+                    runs -= to_run
                 if sync:
                     self._interface.write(
                         self._inp.cmd_fmt.pack(
