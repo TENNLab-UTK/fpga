@@ -42,6 +42,7 @@ dependencies = [
     "numpy",
     "platformdirs",
     "python-periphery",
+    "sortedcontainers",
     "tqdm",
     "waitress",
 ]

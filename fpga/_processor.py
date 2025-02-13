@@ -8,7 +8,6 @@ import pathlib as pl
 import sys
 from collections import deque
 from enum import Enum, IntEnum, auto
-from heapq import heapify, heappop, heappush
 from importlib import resources
 from json import load
 from threading import Thread
@@ -19,6 +18,7 @@ import bitstruct.c as bs
 import neuro
 from edalize.edatool import get_edatool
 from periphery import Serial
+from sortedcontainers import SortedList
 
 import fpga
 from fpga import config, rtl
@@ -45,19 +45,18 @@ neuro.Spike.__gt__ = lambda self, other: self.time > other.time
 neuro.Spike.__ge__ = lambda self, other: self.time >= other.time
 
 
-class _InpQueue(list):
+class _InpQueue(SortedList):
     def __init__(self, data: Iterable[neuro.Spike]):
         super().__init__(data)
-        heapify(self)
 
     def append(self, item: neuro.Spike) -> None:
-        heappush(self, item)
+        super().add(item)
 
     def extend(self, iterable: Iterable[neuro.Spike]) -> None:
-        [self.append(item) for item in iterable]
+        super().update(iterable)
 
     def popleft(self) -> neuro.Spike:
-        return heappop(self)
+        return super().pop(0)
 
 
 class IoType(Enum):
