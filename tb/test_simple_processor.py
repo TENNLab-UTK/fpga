@@ -6,7 +6,6 @@
 
 import inspect
 import pathlib as pl
-from enum import IntEnum
 
 import cocotb
 import neuro
@@ -15,6 +14,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from testing import reset, runner
 
+from fpga._processor import DispatchOpcode as opcode
 from fpga.network import charge_width, proc_params_dict
 
 proj_path = pl.Path(__file__).parent.parent
@@ -36,19 +36,12 @@ full = int(proc_params_dict(net)["max_weight"])
 partial = threshold_0 // 3
 
 
-class opcode(IntEnum):
-    NOP = 0
-    RUN = 1
-    SPK = 2
-    CLR = 3
-
-
 def instr_spike(value: int, index: int = 0) -> int:
     return (opcode.SPK << operand_width) + (index << net_charge_width) + value
 
 
 def instr_run() -> int:
-    return opcode.RUN << operand_width
+    return (opcode.RUN << operand_width) + 1
 
 
 @cocotb.test()
@@ -66,22 +59,22 @@ async def simple_processor_nominal(dut: cocotb.handle.HierarchyObject) -> None:
             if run in range(full_start, full_end):
                 # spike full
                 await FallingEdge(dut.clk)
-                dut.instr.value = instr_spike(full)
+                dut.inp.value = instr_spike(full)
             elif run in range(partial_start, partial_end):
                 # spike partial
                 await FallingEdge(dut.clk)
-                dut.instr.value = instr_spike(partial)
+                dut.inp.value = instr_spike(partial)
             # run
             await FallingEdge(dut.clk)
-            dut.instr.value = instr_run()
+            dut.inp.value = instr_run()
             if run in [full_end + delay, partial_end + delay]:
                 print(f"run: {run}")
-                assert dut.out.value == 1
+                assert dut.out.value % 2 == 1
             else:
-                assert dut.out.value == 0
+                assert dut.out.value % 2 == 0
 
     dut.arstn.value = 1
-    dut.instr.value = 0
+    dut.inp.value = 0
     clock = Clock(dut.clk, 10)
     await cocotb.start(clock.start())
 
@@ -96,7 +89,13 @@ def test_simple_processor() -> None:
         inspect.currentframe().f_code.co_name,
         "basic_processor",
         net,
-        ["dispatch_source", "stream_sink", "basic_processor"],
+        [
+            "io_configs",
+            "network_arstn",
+            "dispatch_source",
+            "stream_sink",
+            "basic_processor",
+        ],
     )
 
 

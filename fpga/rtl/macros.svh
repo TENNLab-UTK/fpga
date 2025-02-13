@@ -19,6 +19,3 @@
 // signed number representation helper functions
 `define signed_repr_max(WIDTH) (1 << ((WIDTH)-1)) - 1
 `define signed_repr_min(WIDTH) -(1 << ((WIDTH)-1))
-
-// field polymorphism helper functions
-`define SRC_WIDTH ((OPC_WIDTH) + `max((SPK_WIDTH), (RUN_WIDTH)))
