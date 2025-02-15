@@ -307,6 +307,20 @@ class Processor(neuro.Processor):
             )
         rx_thread.join()
 
+    def _await_runs_receivable(self) -> int:
+        while True:
+            bytes_incoming = len(self._run_bytes_fifo) * self._max_bytes_per_run
+            ret = max(
+                int(
+                    (self._out.buffer_depth() - bytes_incoming)
+                    / self._min_bytes_per_run
+                ),
+                0,
+            )
+            if ret:
+                return ret
+            sleep(100e-9)
+
     def _hw_rx(self, target: int, seek_clr: bool = False) -> None:
         num_rx_bytes = width_bits_to_bytes(self._out.spk_fmt.calcsize())
 
@@ -404,12 +418,10 @@ class Processor(neuro.Processor):
                         [
                             runs,
                             self._max_run,
-                            self._max_runs_ahead + self._out.time - self._inp.time,
+                            self._await_runs_receivable(),
                         ]
                     )
-                    if not to_run:
-                        sleep(100e-9)
-                        continue
+
                     self._hw_write(
                         self._inp.cmd_fmt.pack(
                             {
@@ -446,11 +458,13 @@ class Processor(neuro.Processor):
                 spike_dict[StreamFlag.SNC.name] = sync and (runs == 1)
                 if self._inp.time == 0:
                     spike_dict[StreamFlag.CLR.name] = True
+                self._await_runs_receivable()
                 self._hw_write(self._inp.spk_fmt.pack(spike_dict)[::-1], runs=1)
 
                 for r in reversed(range(runs - 1)):
                     if sync and r == 0:
                         run_dict[StreamFlag.SNC.name] = True
+                    self._await_runs_receivable()
                     self._hw_write(self._inp.spk_fmt.pack(run_dict)[::-1], runs=1)
 
     def _hw_write(self, *args, **kwargs):
@@ -458,12 +472,10 @@ class Processor(neuro.Processor):
         runs = kwargs.pop("runs", 0)
         size = len(args[0])
         # avoid deadlock
-        if (runs > self._max_runs_ahead) or (size > self._inp.buffer_depth()):
+        if size > self._inp.buffer_depth():
             raise ValueError(f"Packet violates communication limits.")
-        # don't exceed the maximum number of runs or bytes ahead TX can be of RX
-        while (self._inp.time + runs - self._out.time > self._max_runs_ahead) or (
-            sum(self._run_bytes_fifo) + size > self._inp.buffer_depth()
-        ):
+        # don't exceed the maximum number of bytes ahead TX can be of RX
+        while sum(self._run_bytes_fifo) + size > self._inp.buffer_depth():
             sleep(100e-9)
         ret = self._interface.write(*args, **kwargs)
         self._run_bytes_fifo[-1] += size
@@ -611,16 +623,27 @@ class Processor(neuro.Processor):
         backend.run()
 
     def _set_comm_limits(self):
-        max_bytes_per_run = width_bits_to_bytes(self._out.spk_fmt.calcsize())
+        self._max_bytes_per_run = width_bits_to_bytes(self._out.spk_fmt.calcsize())
+        self._min_bytes_per_run = self._max_bytes_per_run
         match self._out.type:
             case IoType.DISPATCH:
-                max_bytes_per_run *= self._network.num_outputs() + 1
+                # a spike for every neuron and one of every opcode aside from SPK
+                self._max_bytes_per_run *= self._network.num_outputs() + (
+                    len(DispatchOpcode) - 1
+                )
+                self._min_bytes_per_run /= (
+                    2
+                    ** (
+                        self._out.cmd_fmt.calcsize()
+                        - unsigned_width(len(DispatchOpcode) - 1)
+                    )
+                    - 1
+                )
             case IoType.STREAM:
                 pass
             case _:
                 raise ValueError()
-        self._max_run = SYSTEM_BUFFER // max_bytes_per_run
-        self._max_runs_ahead = self._max_run
+        self._max_run = int(self._out.buffer_depth() / self._max_bytes_per_run)
 
         match self._inp.type:
             case IoType.DISPATCH:
