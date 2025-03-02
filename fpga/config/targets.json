@@ -2,6 +2,7 @@
     "basys3": {
         "default_tool": "vivado",
         "parameters": {
+            "bram_bits": 1843200,
             "clk_freq": 100000000.0,
             "uart": {
                 "baud_rates": [
@@ -19,9 +20,7 @@
                     3000000,
                     3500000,
                     4000000
-                ],
-                "buffer_rx": 4096,
-                "buffer_tx": 4096
+                ]
             }
         },
         "tools": {
