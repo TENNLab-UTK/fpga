@@ -10,6 +10,7 @@ from collections import deque
 from enum import Enum, IntEnum, auto
 from importlib import resources
 from json import load
+from mmap import PAGESIZE
 from threading import Thread
 from time import sleep
 from typing import Iterable
@@ -22,7 +23,8 @@ from sortedcontainers import SortedList
 
 import fpga
 from fpga import config, rtl
-from fpga._math import unsigned_width, width_bits_to_bytes, width_nearest_byte
+from fpga._comms import SerialMill
+from fpga._math import prevpow2, unsigned_width, width_bits_to_bytes, width_nearest_byte
 from fpga.network import (
     HASH_LEN,
     build_network_sv,
@@ -141,10 +143,7 @@ class InpConfig(_IoConfig):
         self.queue = _InpQueue([])
 
     def buffer_depth(self):
-        return min(
-            self._proc._target_config["parameters"]["uart"]["buffer_rx"],
-            SYSTEM_BUFFER,
-        )
+        return prevpow2(self._proc._target_config["parameters"]["bram_bits"] // 8)
 
     def _num_net_io(self):
         return self._proc._network.num_inputs()
@@ -161,10 +160,9 @@ class OutConfig(_IoConfig):
         self.queue = {out: [] for out in range(self._proc._network.num_outputs())}
 
     def buffer_depth(self):
-        return min(
-            self._proc._target_config["parameters"]["uart"]["buffer_tx"],
-            SYSTEM_BUFFER,
-        )
+        if hasattr(self._proc._interface, "size"):
+            return self._proc._interface.size
+        return PAGESIZE
 
     def _num_net_io(self):
         return self._proc._network.num_outputs()
@@ -199,7 +197,7 @@ class Processor(neuro.Processor):
             except IndexError:
                 pass
             interface = Serial(interface, baudrate)
-        self._interface = interface
+        self._interface = SerialMill(interface)
 
         self._io_type = io_type.upper()
 
@@ -313,7 +311,7 @@ class Processor(neuro.Processor):
             ret = max(
                 int(
                     (self._out.buffer_depth() - bytes_incoming)
-                    / self._min_bytes_per_run
+                    / self._max_bytes_per_run
                 ),
                 0,
             )
@@ -477,9 +475,9 @@ class Processor(neuro.Processor):
         # don't exceed the maximum number of bytes ahead TX can be of RX
         while sum(self._run_bytes_fifo) + size > self._inp.buffer_depth():
             sleep(100e-9)
-        ret = self._interface.write(*args, **kwargs)
         self._run_bytes_fifo[-1] += size
         self._run_bytes_fifo.extend([0] * runs)
+        ret = self._interface.write(*args, **kwargs)
         self._inp.time += runs
         return ret
 
@@ -624,20 +622,11 @@ class Processor(neuro.Processor):
 
     def _set_comm_limits(self):
         self._max_bytes_per_run = width_bits_to_bytes(self._out.spk_fmt.calcsize())
-        self._min_bytes_per_run = self._max_bytes_per_run
         match self._out.type:
             case IoType.DISPATCH:
                 # a spike for every neuron and one of every opcode aside from SPK
                 self._max_bytes_per_run *= self._network.num_outputs() + (
                     len(DispatchOpcode) - 1
-                )
-                self._min_bytes_per_run /= (
-                    2
-                    ** (
-                        self._out.cmd_fmt.calcsize()
-                        - unsigned_width(len(DispatchOpcode) - 1)
-                    )
-                    - 1
                 )
             case IoType.STREAM:
                 pass

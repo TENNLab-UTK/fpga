@@ -3,11 +3,23 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-from math import ceil, log2
+from math import ceil, floor, log2
 
 
 def clog2(value: float) -> int:
     return int(ceil(log2(value)))
+
+
+def flog2(value: float) -> int:
+    return int(floor(log2(value)))
+
+
+def nextpow2(value: float) -> int:
+    return 1 << clog2(value)
+
+
+def prevpow2(value: float) -> int:
+    return 1 << flog2(value)
 
 
 def signed_width(value: int) -> int:
