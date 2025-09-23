@@ -29,6 +29,7 @@ from fpga.network import (
     hash_network,
     proc_name,
     spike_value_factor,
+    single_spike_synapses
 )
 
 SYSTEM_BUFFER = 4096
@@ -471,7 +472,7 @@ class Processor(neuro.Processor):
                     "file_type": "systemVerilogSource",
                 }
                 for module in [
-                    f"{proc}_neuron",
+                    (f"{proc}_neuron_single_spike_synapses" if single_spike_synapses(self._network) else f"{proc}_neuron"),
                     f"{proc}_synapse",
                 ]
             ]

@@ -55,6 +55,13 @@ def spike_value_factor(net: neuro.Network) -> float:
     return svf
 
 
+def single_spike_synapses(net: neuro.Network) -> bool:
+    proc_params = proc_params_dict(net)
+    if "single_spike_synapses" in proc_params:
+        return proc_params["single_spike_synapses"]
+    return False
+
+
 def proc_params_dict(net: neuro.Network) -> dict:
     proc_params = net.get_data("proc_params")
     if type(proc_params) is not dict:
@@ -162,54 +169,6 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     # end formatting functions
 
-    for n in net.nodes():
-        node = net.get_node(n)
-        num_inp_ports = _num_inp_ports(node)
-        f.write(f"    // Start Neuron {neur_id(node.id)}\n")
-        f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
-        f.write(
-            f"    logic signed [CHARGE_WIDTH-1:0]"
-            f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
-        )
-        if node.input_id > -1:
-            if (thresh(node) + int(not thresh_incl)) > spike_value_factor(net):
-                warn(
-                    f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
-                    f" of {thresh(node)} which cannot be solely triggered by an"
-                    f" input scaling value of {spike_value_factor(net)}."
-                )
-            # use the last indexed port for input to make synapse generation easier
-            f.write(
-                f"    assign neur_{node.id:0{neur_id_digits}d}"
-                f"_inp[{num_inp_ports - 1}]"
-                f" = inp[{node.input_id}];\n"
-            )
-        f.write(f"\n")
-
-        f.write(f"    risp_neuron #(\n")
-        f.write(f"        .THRESHOLD({thresh(node)}),\n")
-        f.write(f"        .LEAK({leak(node)}),\n")
-        f.write(f"        .NUM_INP({num_inp_ports}),\n")
-        f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
-        f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
-        f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
-        f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
-        f.write(f"    ) neur_{neur_id(node.id)} (\n")
-        f.write(f"        .clk,\n")
-        f.write(f"        .arstn,\n")
-        f.write(f"        .en,\n")
-        f.write(f"        .inp(neur_{neur_id(node.id)}_inp),\n")
-        f.write(f"        .fire(neur_{neur_id(node.id)}_fire)\n")
-        f.write(f"    );\n")
-
-        if node.output_id > -1:
-            f.write(f"\n")
-            f.write(
-                f"    assign out[{node.output_id}] = neur_{neur_id(node.id)}_fire;\n"
-            )
-
-        f.write(f"    //  End  Neuron {neur_id(node.id)}\n\n")
-
     weight_idx = net.get_edge_property("Weight").index
 
     def weight(edge: neuro.Edge) -> int:
@@ -220,30 +179,169 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     def delay(edge: neuro.Edge) -> int:
         return int(edge.values[delay_idx])
 
+    is_single_spike_synapses = single_spike_synapses(net)
     for n in net.nodes():
         node = net.get_node(n)
-        for inp_idx in range(len(node.incoming)):
-            inp = node.incoming[inp_idx]
+        num_inp_ports = _num_inp_ports(node)
+
+        f.write(f"    // Start Neuron {neur_id(node.id)}\n")
+
+        if is_single_spike_synapses:
+
+            max_outgoing_delay = 0
+            for out_idx in range(len(node.outgoing)):
+                out = node.outgoing[out_idx]
+                max_outgoing_delay = max(max_outgoing_delay, delay(out))
+
+            max_incoming_max_outgoing_delay = 0
+            for inp_idx in range(len(node.incoming)):
+                inp = node.incoming[inp_idx]
+                for inp_pre_out_idx in range(len(inp.pre.outgoing)):
+                    inp_pre_out = inp.pre.outgoing[inp_pre_out_idx]
+                    max_incoming_max_outgoing_delay = max(max_incoming_max_outgoing_delay, delay(inp_pre_out))
+                
+
+            last_fire_time_width = signed_width(max_outgoing_delay)
+            max_last_fire_time_width = signed_width(max_incoming_max_outgoing_delay)
+
+            incoming_delays = list(map(str, [delay(node.incoming[inp_idx]) for inp_idx in range(len(node.incoming))]))
+            incoming_weights = list(map(str, [weight(node.incoming[inp_idx]) for inp_idx in range(len(node.incoming))]))
+            incoming_last_fire_times = [f"neur_{neur_id(node.incoming[inp_idx].pre.id)}_last_fire_time" for inp_idx in range(len(node.incoming))]
+
+            if node.input_id > -1:
+                incoming_delays.append("0")
+                incoming_weights.append(f"inp[{node.input_id}]")
+                incoming_last_fire_times.append(f"(inp[{node.input_id}] != 0) ? 0 : 1")
+                if (thresh(node) + int(not thresh_incl)) > spike_value_factor(net):
+                    warn(
+                        f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
+                        f" of {thresh(node)} which cannot be solely triggered by an"
+                        f" input scaling value of {spike_value_factor(net)}."
+                    )
+
+            f.write(
+                f"    logic signed [CHARGE_WIDTH-1:0]"
+                f" neur_{neur_id(node.id)}_weights [0:{num_inp_ports - 1}];\n"
+            )
+            f.write(
+                f"    logic signed [{max_last_fire_time_width}-1:0]"
+                f" neur_{neur_id(node.id)}_last_fire_times [0:{num_inp_ports - 1}];\n"
+            )
+            f.write(
+                f"    logic signed [{last_fire_time_width}-1:0]"
+                f" neur_{neur_id(node.id)}_last_fire_time;\n"
+            )
+            f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
             f.write(f"\n")
             f.write(
-                f"    // Start Synapse"
-                f" {neur_id(inp.pre.id)}_{neur_id(inp.post.id)}\n"
+                f"    always_comb begin\n"
+                f"        neur_{neur_id(node.id)}_weights = '{{{','.join(incoming_weights)}}};\n"
+                f"        neur_{neur_id(node.id)}_last_fire_times = '{{{','.join(incoming_last_fire_times)}}};\n"
+                f"    end\n"
             )
-            f.write(f"    risp_synapse #(\n")
-            f.write(f"        .WEIGHT({weight(inp)}),\n")
-            f.write(f"        .DELAY({delay(inp)}),\n")
+
+            f.write(f"\n")
+            
+            f.write(f"    risp_neuron #(\n")
+            f.write(f"        .THRESHOLD({thresh(node)}),\n")
+            f.write(f"        .LEAK({leak(node)}),\n")
+            f.write(f"        .NUM_INP({num_inp_ports}),\n")
+            f.write(f"        .DELAYS('{{{','.join(incoming_delays)}}}),\n")
+            f.write(f"        .MAX_OUTGOING_DELAY({int(max_outgoing_delay)}),\n")
+            f.write(f"        .LAST_FIRE_TIME_WIDTH({last_fire_time_width}),\n")
+            f.write(f"        .MAX_LAST_FIRE_TIME_WIDTH({max_last_fire_time_width}),\n")
             f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
+            f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
+            f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
             f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
-            f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
+            f.write(f"    ) neur_{neur_id(node.id)} (\n")
             f.write(f"        .clk,\n")
             f.write(f"        .arstn,\n")
             f.write(f"        .en,\n")
-            f.write(f"        .inp(neur_{neur_id(inp.pre.id)}_fire),\n")
-            f.write(f"        .out(neur_{neur_id(inp.post.id)}_inp[{inp_idx}])\n")
+            f.write(f"        .weights(neur_{neur_id(node.id)}_weights),\n")
+            f.write(f"        .last_fire_times(neur_{neur_id(node.id)}_last_fire_times),\n")
+            f.write(f"        .last_fire_time(neur_{neur_id(node.id)}_last_fire_time),\n")
+            f.write(f"        .fire(neur_{neur_id(node.id)}_fire)\n")
             f.write(f"    );\n")
+
+            if node.output_id > -1:
+                f.write(f"\n")
+                f.write(
+                    f"    assign out[{node.output_id}] = neur_{neur_id(node.id)}_fire;\n"
+                )
+
+        else:
+            
+            f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
             f.write(
-                f"    //  End  Synapse {neur_id(inp.pre.id)}_{neur_id(inp.post.id)}\n"
+                f"    logic signed [CHARGE_WIDTH-1:0]"
+                f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
             )
+
+            if node.input_id > -1:
+                if (thresh(node) + int(not thresh_incl)) > spike_value_factor(net):
+                    warn(
+                        f"Neuron {neur_id(node.id)} (input {node.input_id}) has a threshold"
+                        f" of {thresh(node)} which cannot be solely triggered by an"
+                        f" input scaling value of {spike_value_factor(net)}."
+                    )
+                # use the last indexed port for input to make synapse generation easier
+                f.write(
+                    f"    assign neur_{neur_id(node.id)}"
+                    f"_inp[{num_inp_ports - 1}]"
+                    f" = inp[{node.input_id}];\n"
+                )
+            f.write(f"\n")
+
+            f.write(f"    risp_neuron #(\n")
+            f.write(f"        .THRESHOLD({thresh(node)}),\n")
+            f.write(f"        .LEAK({leak(node)}),\n")
+            f.write(f"        .NUM_INP({num_inp_ports}),\n")
+            f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
+            f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
+            f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
+            f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
+            f.write(f"    ) neur_{neur_id(node.id)} (\n")
+            f.write(f"        .clk,\n")
+            f.write(f"        .arstn,\n")
+            f.write(f"        .en,\n")
+            f.write(f"        .inp(neur_{neur_id(node.id)}_inp),\n")
+            f.write(f"        .fire(neur_{neur_id(node.id)}_fire)\n")
+            f.write(f"    );\n")
+
+            if node.output_id > -1:
+                f.write(f"\n")
+                f.write(
+                    f"    assign out[{node.output_id}] = neur_{neur_id(node.id)}_fire;\n"
+                )
+
+        f.write(f"    //  End  Neuron {neur_id(node.id)}\n\n")
+
+    if not is_single_spike_synapses:
+        for n in net.nodes():
+            node = net.get_node(n)
+            for inp_idx in range(len(node.incoming)):
+                inp = node.incoming[inp_idx]
+                f.write(f"\n")
+                f.write(
+                    f"    // Start Synapse"
+                    f" {neur_id(inp.pre.id)}_{neur_id(inp.post.id)}\n"
+                )
+                f.write(f"    risp_synapse #(\n")
+                f.write(f"        .WEIGHT({weight(inp)}),\n")
+                f.write(f"        .DELAY({delay(inp)}),\n")
+                f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
+                f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
+                f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
+                f.write(f"        .clk,\n")
+                f.write(f"        .arstn,\n")
+                f.write(f"        .en,\n")
+                f.write(f"        .inp(neur_{neur_id(inp.pre.id)}_fire),\n")
+                f.write(f"        .out(neur_{neur_id(inp.post.id)}_inp[{inp_idx}])\n")
+                f.write(f"    );\n")
+                f.write(
+                    f"    //  End  Synapse {neur_id(inp.pre.id)}_{neur_id(inp.post.id)}\n"
+                )
 
     f.write(f"endmodule\n")
 
