@@ -219,6 +219,12 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
                         f" input scaling value of {spike_value_factor(net)}."
                     )
 
+            if num_inp_ports == 0:
+                incoming_delays.append("0")
+                incoming_weights.append("0")
+                incoming_last_fire_times.append("1")
+                num_inp_ports = 1
+
             f.write(
                 f"    logic signed [CHARGE_WIDTH-1:0]"
                 f" neur_{neur_id(node.id)}_weights [0:{num_inp_ports - 1}];\n"
