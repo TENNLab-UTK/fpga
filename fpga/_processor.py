@@ -580,6 +580,17 @@ class Processor(neuro.Processor):
 
         proj_path.mkdir(parents=True, exist_ok=True)
         backend.configure()
+
+        if tool == "vivado":
+            with open(proj_path / (str(nethash) + "_run.tcl"), "a") as f:
+                f.write(
+                    f'\n'
+                    f'# Report utilization\n'
+                    f'open_checkpoint {nethash}.runs/impl_1/uart_top_routed.dcp\n'
+                    f'report_utilization -hierarchical -file util_report.txt\n'
+                    f'puts "Utilization report written to util_report.txt"\n'
+                )
+
         backend.build()
         backend.run()
 
