@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Keegan Dent
+# Copyright (c) 2024-2025 Keegan Dent
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -93,20 +93,22 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     )
 
     f.write(f"package network{suffix}_config;\n")
-    f.write(f"    localparam int NET_CHARGE_WIDTH = {net_charge_width};\n")
-    f.write(f"    localparam int NET_NUM_INP = {num_inp};\n")
-    f.write(f"    localparam int NET_NUM_OUT = {num_out};\n")
+    f.write(f"    localparam int CHARGE_WIDTH = {net_charge_width};\n")
+    f.write(f"    localparam int NUM_INP = {num_inp};\n")
+    f.write(f"    localparam int NUM_OUT = {num_out};\n")
     f.write(f"endpackage\n\n")
-
-    f.write(f"import network{suffix}_config::*;\n\n")
 
     f.write(f"module network{suffix} (\n")
     f.write(f"    input logic clk,\n")
     f.write(f"    input logic arstn,\n")
     f.write(f"    input logic en,\n")
-    f.write(f"    input logic signed [NET_CHARGE_WIDTH-1:0] inp [0:NET_NUM_INP-1],\n")
-    f.write(f"    output logic [NET_NUM_OUT-1:0] out\n")
+    f.write(
+        f"    input logic signed [network{suffix}_config::CHARGE_WIDTH-1:0]"
+        + f" inp [0:network{suffix}_config::NUM_INP-1],\n"
+    )
+    f.write(f"    output logic [network{suffix}_config::NUM_OUT-1:0] out\n")
     f.write(f");\n")
+    f.write(f"import network{suffix}_config::*;\n\n")
 
     # begin formatting functions
 
@@ -166,7 +168,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"    // Start Neuron {neur_id(node.id)}\n")
         f.write(f"    logic neur_{neur_id(node.id)}_fire;\n")
         f.write(
-            f"    logic signed [NET_CHARGE_WIDTH-1:0]"
+            f"    logic signed [CHARGE_WIDTH-1:0]"
             f" neur_{neur_id(node.id)}_inp [0:{num_inp_ports - 1}];\n"
         )
         if node.input_id > -1:
@@ -188,7 +190,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"        .THRESHOLD({thresh(node)}),\n")
         f.write(f"        .LEAK({leak(node)}),\n")
         f.write(f"        .NUM_INP({num_inp_ports}),\n")
-        f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
+        f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
         f.write(f"        .POTENTIAL_MIN({int(min_potential)}),\n")
         f.write(f"        .THRESHOLD_INCLUSIVE({int(thresh_incl)}),\n")
         f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
@@ -230,7 +232,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f.write(f"    risp_synapse #(\n")
             f.write(f"        .WEIGHT({weight(inp)}),\n")
             f.write(f"        .DELAY({delay(inp)}),\n")
-            f.write(f"        .CHARGE_WIDTH(NET_CHARGE_WIDTH),\n")
+            f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
             f.write(f"        .FIRE_LIKE_RAVENS({int(fire_like_ravens)})\n")
             f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
             f.write(f"        .clk,\n")

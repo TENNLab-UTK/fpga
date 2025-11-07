@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -8,15 +8,12 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable conditions.
 
+`include "macros.svh"
+
 package processor_config;
-    import source_config::*;
-    import sink_config::*;
-
-    parameter int RUN_WIDTH = SPK_WIDTH;
-    parameter int INSTR_WIDTH = `SRC_WIDTH;
+    parameter int INP_WIDTH = source_config::PFX_WIDTH + `max(source_config::SPK_WIDTH, 1);
+    parameter int OUT_WIDTH = sink_config::PFX_WIDTH + `max(sink_config::SPK_WIDTH, 1);
 endpackage
-
-import processor_config::*;
 
 // This processor is a simple example that may be useful when two conditions are met:
 // 1. The instruction is valid for every clock cycle.
@@ -25,38 +22,50 @@ import processor_config::*;
 module basic_processor (
     input logic clk,
     input logic arstn,
-    input logic [INSTR_WIDTH-1:0] instr,
-    output logic [NET_NUM_OUT-1:0] out
+    input logic [processor_config::INP_WIDTH-1:0] inp,
+    output logic [processor_config::OUT_WIDTH-1:0] out
 );
-    logic net_valid;
-    logic net_ready;
+    import processor_config::*;
+    logic net_ready, net_run, net_sync, net_clear, net_arstn;
 
     network_source #(
-        .RUN_WIDTH
+        .PKT_WIDTH(INP_WIDTH)
     ) source (
-        .clk(clk),
-        .arstn(arstn),
+        .clk,
+        .arstn,
         .src_valid(1),
-        .src(instr),
+        .src(inp),
         .net_ready,
-        .net_valid
+        .net_run,
+        .net_sync,
+        .net_clear
+    );
+
+    network_arstn resetter (
+        .clk,
+        .arstn,
+        .net_clear,
+        .net_arstn
     );
 
     network net (
-        .clk(clk),
-        .arstn(source.net_arstn),
-        .en(net_valid && net_ready),
+        .clk,
+        .arstn(net_arstn),
+        .en(net_run && net_ready),
         .inp(source.net_inp)
     );
 
-    network_sink sink (
-        .clk(clk),
-        .arstn(arstn),
-        .net_valid,
+    network_sink #(
+        .PKT_WIDTH(OUT_WIDTH)
+    ) sink (
+        .clk,
+        .arstn,
+        .net_run,
+        .net_sync,
         .net_ready,
+        .net_clear,
         .net_out(net.out),
         .snk_ready(1),
         .snk(out)
     );
-
 endmodule
