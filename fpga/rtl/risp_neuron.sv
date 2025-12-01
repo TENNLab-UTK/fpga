@@ -21,6 +21,7 @@ module risp_neuron #(
 ) (
     input logic clk,
     input logic arstn,
+    input logic clear,
     input logic en,
     input logic signed [CHARGE_WIDTH-1:0] inp [0:NUM_INP-1],
     output logic fire
@@ -39,7 +40,7 @@ module risp_neuron #(
 
     always_comb begin: calc_do_fire
         // determine if neuron fires this cycle
-        sum = LEAK ? FUSE_START : fuse;
+        sum = (LEAK || clear) ? FUSE_START : fuse;
         for (int i = 0; i < NUM_INP; i++)
             sum -= inp[i];
         do_fire = sum <= 0;
