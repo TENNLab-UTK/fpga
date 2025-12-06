@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
