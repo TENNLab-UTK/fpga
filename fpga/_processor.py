@@ -166,7 +166,7 @@ class Processor(neuro.Processor):
     def __init__(
         self,
         target: str,
-        interface: Serial | str,
+        interface: Serial | str = "",
         io_type: str = "DISO",
         *args,
         **kwargs,
@@ -186,8 +186,12 @@ class Processor(neuro.Processor):
                 pass
             except IndexError:
                 pass
-            interface = Serial(interface, baudrate)
+            if interface != "":
+                interface = Serial(interface, baudrate)
+        else:
+            baudrate = interface.baudrate
         self._interface = interface
+        self._baudrate = baudrate
 
         self._io_type = io_type.upper()
 
@@ -250,6 +254,9 @@ class Processor(neuro.Processor):
         self._setup_io()
         backend = self._build_network()
         if should_program:
+            if self._interface == "":
+                raise RuntimeError("Cannot program network onto FPGA without a valid serial interface.")
+
             backend.run()
             self._programmed = True
             # hardware will sometimes send CLR on startup
@@ -531,7 +538,7 @@ class Processor(neuro.Processor):
             },
             "BAUD_RATE": {
                 "datatype": "str",
-                "default": f"{self._interface.baudrate}",
+                "default": f"{self._baudrate}",
                 "paramtype": "vlogparam",
             },
         }
@@ -615,7 +622,7 @@ class Processor(neuro.Processor):
                 pass
             case _:
                 raise ValueError()
-        self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
+        self._secs_per_run += max_bytes_per_run * 10 / self._baudrate
         self._max_run = SYSTEM_BUFFER // max_bytes_per_run
         self._max_runs_ahead = self._max_run
 
