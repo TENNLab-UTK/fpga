@@ -166,7 +166,7 @@ class Processor(neuro.Processor):
     def __init__(
         self,
         target: str,
-        interface: Serial | str = "",
+        interface: Serial | str | None = None,
         io_type: str = "DISO",
         *args,
         **kwargs,
@@ -178,7 +178,7 @@ class Processor(neuro.Processor):
         with open(resources.files(config).joinpath("targets.json")) as f:
             self._target_config = load(f)[self._target_name]
 
-        if type(interface) is str:
+        if interface is None or isinstance(interface, str):
             baudrate = 115200
             try:
                 baudrate = self._target_config["parameters"]["uart"]["baud_rates"][-1]
@@ -186,10 +186,12 @@ class Processor(neuro.Processor):
                 pass
             except IndexError:
                 pass
-            if interface != "":
+            if isinstance(interface, str):
                 interface = Serial(interface, baudrate)
-        else:
+        elif isinstance(interface, Serial):
             baudrate = interface.baudrate
+        else:
+            raise RuntimeError("fpga Processor interface must be a periphery.Serial or str or None object.")
         self._interface = interface
         self._baudrate = baudrate
 
@@ -254,7 +256,7 @@ class Processor(neuro.Processor):
         self._setup_io()
         backend = self._build_network()
         if should_program:
-            if self._interface == "":
+            if not isinstance(self._interface, Serial):
                 raise RuntimeError("Cannot program network onto FPGA without a valid serial interface.")
 
             backend.run()
