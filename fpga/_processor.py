@@ -499,6 +499,7 @@ class Processor(neuro.Processor):
                 for module in [
                     f"{proc}_neuron",
                     f"{proc}_synapse",
+                    f"{proc}_synapse_single_spike"
                 ]
             ]
         )

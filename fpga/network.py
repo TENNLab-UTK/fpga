@@ -214,22 +214,38 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
 
     def weight(edge: neuro.Edge) -> int:
         return int(edge.values[weight_idx])
+    
+    single_spike_idx = -1
+    if net.is_edge_property("SingleSpike"):
+        single_spike_idx = net.get_edge_property("SingleSpike").index
 
+    single_spike_delay_idx = -1
+    if net.is_edge_property("SingleSpikeDelay"):
+        single_spike_delay_idx = net.get_edge_property("SingleSpikeDelay").index
+
+    def single_spike(edge: neuro.Edge) -> bool:
+        if single_spike_idx < 0 or single_spike_delay_idx < 0:
+            return False
+        return bool(edge.values[single_spike_idx])
+    
     delay_idx = net.get_edge_property("Delay").index
 
     def delay(edge: neuro.Edge) -> int:
+        if single_spike(edge):
+            return int(edge.values[single_spike_delay_idx])
         return int(edge.values[delay_idx])
 
     for n in net.nodes():
         node = net.get_node(n)
         for inp_idx in range(len(node.incoming)):
             inp = node.incoming[inp_idx]
+            synapse_module_name = "risp_synapse" if not single_spike(inp) else "risp_synapse_single_spike"
             f.write(f"\n")
             f.write(
                 f"    // Start Synapse"
                 f" {neur_id(inp.pre.id)}_{neur_id(inp.post.id)}\n"
             )
-            f.write(f"    risp_synapse #(\n")
+            f.write(f"    {synapse_module_name} #(\n")
             f.write(f"        .WEIGHT({weight(inp)}),\n")
             f.write(f"        .DELAY({delay(inp)}),\n")
             f.write(f"        .CHARGE_WIDTH(CHARGE_WIDTH),\n")
