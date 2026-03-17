@@ -1,0 +1,286 @@
+{
+  "Associated_Data": {
+    "app_params": {
+      "cart_friction": 0,
+      "cart_mass": 1,
+      "dt": 0.02,
+      "force_magnitude": 10,
+      "gravity": 9.81,
+      "include_no_action": false,
+      "max_theta": 0.209,
+      "max_thetad": 2,
+      "max_timesteps": 15000,
+      "max_x": 2.4,
+      "max_xd": 2,
+      "num_poles": 1,
+      "pole_ball_masses": [
+        0.0
+      ],
+      "pole_frictions": [
+        0
+      ],
+      "pole_lengths": [
+        1
+      ],
+      "pole_masses": [
+        0.1
+      ],
+      "steps_per_push": 1,
+      "use_velocities": true
+    },
+    "decoder_array": {
+      "decoders": [
+        {
+          "spikes": {
+            "binning_style": "wta",
+            "bins": 2
+          }
+        }
+      ],
+      "divisor": 24.0,
+      "dmax": [
+        1.0
+      ],
+      "dmin": [
+        0.0
+      ]
+    },
+    "encoder_array": {
+      "dmax": [
+        2.4,
+        2.0,
+        0.209,
+        2.0
+      ],
+      "dmin": [
+        -2.4,
+        -2.0,
+        -0.209,
+        -2.0
+      ],
+      "encoders": [
+        {
+          "spikes": {
+            "flip_flop": 2,
+            "ignore_extremes": false,
+            "ignore_min": false,
+            "max_spikes": 8
+          }
+        }
+      ],
+      "interval": 24.0
+    },
+    "eons_params": {
+      "add_edge_rate": 0.75,
+      "add_node_rate": 0.75,
+      "crossover_rate": 0.5,
+      "delete_edge_rate": 0.25,
+      "delete_node_rate": 0.25,
+      "edge_mutations": {
+        "Delay": 0.3,
+        "Weight": 0.7
+      },
+      "edge_params_rate": 2.5,
+      "merge_rate": 0,
+      "multi_edges": 0,
+      "mutation_rate": 0.9,
+      "net_mutations": {},
+      "net_params_rate": 0,
+      "node_mutations": {
+        "Threshold": 1.0
+      },
+      "node_params_rate": 2.5,
+      "num_best": 3,
+      "num_mutations": 4,
+      "population_size": 500,
+      "random_factor": 0.05,
+      "selection_type": "tournament",
+      "starting_edges": 10,
+      "starting_nodes": 0,
+      "tournament_best_net_factor": 0.9,
+      "tournament_size_factor": 0.1
+    },
+    "other": {
+      "app_name": "polebalance",
+      "proc_name": "risp",
+      "sim_time": 24,
+      "timeseries": "none"
+    },
+    "proc_params": {
+      "discrete": true,
+      "leak_mode": "none",
+      "max_delay": 12,
+      "max_threshold": 1,
+      "max_weight": 1,
+      "min_potential": 0,
+      "min_threshold": 1,
+      "min_weight": 1
+    }
+  },
+  "Edges": [
+    {
+      "from": 1,
+      "to": 9,
+      "values": [
+        1.0,
+        8.0
+      ]
+    },
+    {
+      "from": 2,
+      "to": 4,
+      "values": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "from": 4,
+      "to": 8,
+      "values": [
+        1.0,
+        6.0
+      ]
+    },
+    {
+      "from": 5,
+      "to": 9,
+      "values": [
+        1.0,
+        12.0
+      ]
+    },
+    {
+      "from": 6,
+      "to": 4,
+      "values": [
+        1.0,
+        5.0
+      ]
+    },
+    {
+      "from": 7,
+      "to": 1,
+      "values": [
+        1.0,
+        5.0
+      ]
+    },
+    {
+      "from": 7,
+      "to": 5,
+      "values": [
+        1.0,
+        5.0
+      ]
+    }
+  ],
+  "Inputs": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "Network_Values": [],
+  "Nodes": [
+    {
+      "id": 0,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 1,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 2,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 3,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 4,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 5,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 6,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 7,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 8,
+      "values": [
+        1.0
+      ]
+    },
+    {
+      "id": 9,
+      "values": [
+        1.0
+      ]
+    }
+  ],
+  "Outputs": [
+    8,
+    9
+  ],
+  "Properties": {
+    "edge_properties": [
+      {
+        "index": 1,
+        "max_value": 12.0,
+        "min_value": 1.0,
+        "name": "Delay",
+        "size": 1,
+        "type": 73
+      },
+      {
+        "index": 0,
+        "max_value": 1.0,
+        "min_value": 1.0,
+        "name": "Weight",
+        "size": 1,
+        "type": 73
+      }
+    ],
+    "network_properties": [],
+    "node_properties": [
+      {
+        "index": 0,
+        "max_value": 1.0,
+        "min_value": 1.0,
+        "name": "Threshold",
+        "size": 1,
+        "type": 73
+      }
+    ]
+  }
+}
