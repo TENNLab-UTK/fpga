@@ -21,7 +21,7 @@ module risp_synapse_single_spike #(
     output logic signed [CHARGE_WIDTH-1:0] out
 );
     localparam TRUE_DELAY = DELAY - FIRE_LIKE_RAVENS;
-    logic [$clog2(TRUE_DELAY+2)-1:0] spike_timestep_counter;
+    logic [$clog2(TRUE_DELAY+1)-1:0] spike_timestep_counter;
 
     assign out = (spike_timestep_counter == 1) ? WEIGHT : 0;
 
@@ -29,11 +29,13 @@ module risp_synapse_single_spike #(
         if (arstn == 0) begin
             spike_timestep_counter <= 0;
         end else if (en) begin
-            if (spike_timestep_counter != 0) begin
+            if (spike_timestep_counter > 1) begin
                 spike_timestep_counter <= spike_timestep_counter - 1;
             end else if (inp) begin
-                spike_timestep_counter <= TRUE_DELAY+1;
-            end 
+                spike_timestep_counter <= TRUE_DELAY;
+            end else begin
+                spike_timestep_counter <= 0;
+            end
         end
     end
     
