@@ -167,7 +167,7 @@ class Processor(neuro.Processor):
     def __init__(
         self,
         target: str,
-        interface: Serial | str,
+        interface: Serial | str | None = None,
         io_type: str = "DISO",
         *args,
         **kwargs,
@@ -179,7 +179,7 @@ class Processor(neuro.Processor):
         with open(resources.files(config).joinpath("targets.json")) as f:
             self._target_config = load(f)[self._target_name]
 
-        if type(interface) is str:
+        if interface is None or isinstance(interface, str):
             baudrate = 115200
             try:
                 baudrate = self._target_config["parameters"]["uart"]["baud_rates"][-1]
@@ -187,15 +187,25 @@ class Processor(neuro.Processor):
                 pass
             except IndexError:
                 pass
-            interface = Serial(interface, baudrate)
+            if isinstance(interface, str):
+                interface = Serial(interface, baudrate)
+        elif isinstance(interface, Serial):
+            baudrate = interface.baudrate
+        else:
+            raise RuntimeError("fpga Processor interface must be a periphery.Serial or str or None object.")
         self._interface = interface
+        self._baudrate = baudrate
 
         self._io_type = io_type.upper()
 
         self._network = None
+        self._programmed = False
         self.clear()
 
     def apply_spike(self, spike: neuro.Spike) -> None:
+        if self._programmed is False:
+            raise RuntimeError("Cannot apply spikes before programming the target FPGA.")
+
         if spike.time < 0:
             raise RuntimeError("Spikes cannot be scheduled in the past.")
         self._inp.queue.append(
@@ -215,8 +225,12 @@ class Processor(neuro.Processor):
         if self._network:
             self.clear_activity()
         self._network = None
+        self._programmed = False
 
     def clear_activity(self) -> None:
+        if self._programmed is False:
+            raise RuntimeError("Cannot clear network activity before programming the target FPGA.")
+
         if self._inp.type == IoType.DISPATCH:
             self._interface.write(
                 self._inp.cmd_fmt.pack(
@@ -237,15 +251,21 @@ class Processor(neuro.Processor):
         self._inp.clear()
         self._out.clear()
 
-    def load_network(self, net: neuro.Network) -> None:
+    def load_network(self, net: neuro.Network, should_program: bool = True) -> None:
         self.clear()
         self._network = net
         self._setup_io()
-        self._program_target()
-        # hardware will sometimes send CLR on startup
-        while self._interface.poll(1):
-            self._interface.read(self._interface.input_waiting())
-        self.clear_activity()
+        backend = self._build_network()
+        if should_program:
+            if not isinstance(self._interface, Serial):
+                raise RuntimeError("Cannot program network onto FPGA without a valid serial interface.")
+
+            backend.run()
+            self._programmed = True
+            # hardware will sometimes send CLR on startup
+            while self._interface.poll(1):
+                self._interface.read(self._interface.input_waiting())
+            self.clear_activity()
 
     def output_count(self, out_idx: int) -> int:
         return len(self.output_vector(out_idx))
@@ -266,6 +286,9 @@ class Processor(neuro.Processor):
         ]
 
     def output_vector(self, out_idx: int) -> list[float]:
+        if self._programmed is False:
+            raise RuntimeError("Cannot get output vector before programming the target FPGA.")
+
         return [
             t - self._last_run for t in self._out.queue[out_idx] if t >= self._last_run
         ]
@@ -277,6 +300,9 @@ class Processor(neuro.Processor):
         ]
 
     def run(self, time: int) -> None:
+        if self._programmed is False:
+            raise RuntimeError("Cannot run before programming the target FPGA.")
+
         if time < 1:
             raise ValueError("It's not possible to run for less than 1 timestep")
         target_time = self._inp.time + time
@@ -450,7 +476,7 @@ class Processor(neuro.Processor):
                     self._interface.write(self._inp.spk_fmt.pack(run_dict)[::-1])
                     pause(1)
 
-    def _program_target(self) -> None:
+    def _build_network(self) -> type:
         proc = proc_name(self._network)
 
         nethash = hash_network(self._network, HASH_LEN)
@@ -514,7 +540,7 @@ class Processor(neuro.Processor):
             },
             "BAUD_RATE": {
                 "datatype": "str",
-                "default": f"{self._interface.baudrate}",
+                "default": f"{self._baudrate}",
                 "paramtype": "vlogparam",
             },
         }
@@ -580,7 +606,8 @@ class Processor(neuro.Processor):
         proj_path.mkdir(parents=True, exist_ok=True)
         backend.configure()
         backend.build()
-        backend.run()
+
+        return backend        
 
     def _set_comm_limits(self):
         self._secs_per_run = 0.0
@@ -597,7 +624,7 @@ class Processor(neuro.Processor):
                 pass
             case _:
                 raise ValueError()
-        self._secs_per_run += max_bytes_per_run * 10 / self._interface.baudrate
+        self._secs_per_run += max_bytes_per_run * 10 / self._baudrate
         self._max_run = SYSTEM_BUFFER // max_bytes_per_run
         self._max_runs_ahead = self._max_run
 
