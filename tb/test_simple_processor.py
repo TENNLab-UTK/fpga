@@ -91,7 +91,6 @@ def test_simple_processor() -> None:
         net,
         [
             "io_configs",
-            "network_arstn",
             "dispatch_source",
             "stream_sink",
             "basic_processor",

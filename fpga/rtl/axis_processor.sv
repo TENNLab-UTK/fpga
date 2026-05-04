@@ -31,7 +31,7 @@ module axis_processor (
     import network_config::*;
     import processor_config::*;
 
-    logic net_ready, net_run, net_sync, net_clear, net_arstn;
+    logic net_ready, net_run, net_sync, net_clear;
     logic signed [CHARGE_WIDTH-1:0] net_inp [0:NUM_INP-1];
     logic [NUM_OUT-1:0] net_out;
 
@@ -50,16 +50,10 @@ module axis_processor (
         .net_inp
     );
 
-    network_arstn resetter (
-        .clk,
-        .arstn,
-        .net_clear,
-        .net_arstn
-    );
-
     network net (
         .clk,
-        .arstn(net_arstn),
+        .arstn,
+        .clear(net_clear),
         .en(net_run && net_ready),
         .inp(net_inp),
         .out(net_out)

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Keegan Dent
+// Copyright (c) 2024-2025 Keegan Dent
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-W v2
 // You may redistribute and modify this documentation and make products using
@@ -16,6 +16,7 @@ module risp_synapse #(
 ) (
     input logic clk,
     input logic arstn,
+    input logic clear,
     input logic en,
     input logic inp,
     output logic signed [CHARGE_WIDTH-1:0] out
@@ -25,7 +26,13 @@ module risp_synapse #(
 
     always_comb fifo[0] = inp;
 
-    assign out = fifo[TRUE_DELAY] ? WEIGHT : 0;
+    always_comb begin: calc_out
+        if (fifo[TRUE_DELAY] && !clear) begin
+            out = WEIGHT;
+        end else begin
+            out = 0;
+        end
+    end
 
     genvar i;
     generate
@@ -34,8 +41,13 @@ module risp_synapse #(
             always_ff @(posedge clk or negedge arstn) begin
                 if (arstn == 0) begin
                     fifo[i] <= 0;
-                end else if (en) begin
-                    fifo[i] <= fifo[i-1];
+                end else begin
+                    if (en) begin
+                        fifo[i] <= fifo[i-1];
+                    end
+                    if (clear && !(i==1 && en)) begin
+                        fifo[i] <= 0;
+                    end
                 end
             end
         end

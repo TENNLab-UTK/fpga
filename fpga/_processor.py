@@ -3,6 +3,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 import os.path
 import pathlib as pl
 import sys
@@ -525,7 +526,6 @@ class Processor(neuro.Processor):
                     "io_configs",
                     f"{self._inp.type.name.lower()}_source",
                     f"{self._out.type.name.lower()}_sink",
-                    "network_arstn",
                     "axis_processor",
                     "uart_processor",
                 ]

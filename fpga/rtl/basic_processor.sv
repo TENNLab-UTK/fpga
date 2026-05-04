@@ -26,7 +26,7 @@ module basic_processor (
     output logic [processor_config::OUT_WIDTH-1:0] out
 );
     import processor_config::*;
-    logic net_ready, net_run, net_sync, net_clear, net_arstn;
+    logic net_ready, net_run, net_sync, net_clear;
 
     network_source #(
         .PKT_WIDTH(INP_WIDTH)
@@ -41,16 +41,10 @@ module basic_processor (
         .net_clear
     );
 
-    network_arstn resetter (
-        .clk,
-        .arstn,
-        .net_clear,
-        .net_arstn
-    );
-
     network net (
         .clk,
-        .arstn(net_arstn),
+        .arstn,
+        .clear(net_clear),
         .en(net_run && net_ready),
         .inp(source.net_inp)
     );

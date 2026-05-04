@@ -101,6 +101,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
     f.write(f"module network{suffix} (\n")
     f.write(f"    input logic clk,\n")
     f.write(f"    input logic arstn,\n")
+    f.write(f"    input logic clear,\n")
     f.write(f"    input logic en,\n")
     f.write(
         f"    input logic signed [network{suffix}_config::CHARGE_WIDTH-1:0]"
@@ -197,6 +198,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
         f.write(f"    ) neur_{neur_id(node.id)} (\n")
         f.write(f"        .clk,\n")
         f.write(f"        .arstn,\n")
+        f.write(f"        .clear,\n")
         f.write(f"        .en,\n")
         f.write(f"        .inp(neur_{neur_id(node.id)}_inp),\n")
         f.write(f"        .fire(neur_{neur_id(node.id)}_fire)\n")
@@ -237,6 +239,7 @@ def _write_risp_network_sv(f, net: neuro.Network, suffix: str = "") -> None:
             f.write(f"    ) syn_{neur_id(inp.pre.id)}_{neur_id(inp.post.id)} (\n")
             f.write(f"        .clk,\n")
             f.write(f"        .arstn,\n")
+            f.write(f"        .clear,\n")
             f.write(f"        .en,\n")
             f.write(f"        .inp(neur_{neur_id(inp.pre.id)}_fire),\n")
             f.write(f"        .out(neur_{neur_id(inp.post.id)}_inp[{inp_idx}])\n")
