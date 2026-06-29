@@ -83,7 +83,7 @@ The EDA toolchains you require will depend on which devices you are targetting. 
 First, clone the UTK TENNLab Neuromorphic Framework repository and enter it.
 
 ```bash
-git clone git clone git@bitbucket.org:neuromorphic-utk/framework.git
+git clone https://github.com/TENNLab-UTK/framework-open.git
 cd framework/
 ```
 
