@@ -106,7 +106,7 @@ pip install -e .
 Clone this repository into the requisite location (tentatively `./fpga`).
 
 ```bash
-git clone git@github.com:TENNLab-UTK/fpga.git ./fpga
+git clone https://github.com/TENNLab-UTK/fpga.git ./fpga
 cd fpga
 ```
 
