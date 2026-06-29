@@ -84,7 +84,7 @@ First, clone the UTK TENNLab Neuromorphic Framework repository and enter it.
 
 ```bash
 git clone https://github.com/TENNLab-UTK/framework-open.git
-cd framework/
+cd framework-open/
 ```
 
 It is recommended, but perhaps not mandatory, to create the environment according to the Framework documentation.
