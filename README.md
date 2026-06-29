@@ -88,7 +88,7 @@ cd framework-open/
 ```
 
 It is recommended, but perhaps not mandatory, to create the environment
-according to the Framework[documentation](https://github.com/TENNLab-UTK/framework-open/blob/main/markdown/python_build.md):
+according to the Framework [documentation](https://github.com/TENNLab-UTK/framework-open/blob/main/markdown/python_build.md):
 
 ```bash
 bash scripts/create_env.sh
