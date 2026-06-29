@@ -83,14 +83,14 @@ The EDA toolchains you require will depend on which devices you are targetting. 
 First, clone the UTK TENNLab Neuromorphic Framework repository and enter it.
 
 ```bash
-git clone git clone git@bitbucket.org:neuromorphic-utk/framework.git
-cd framework/
+git clone https://github.com/TENNLab-UTK/framework-open.git
+cd framework-open/
 ```
 
-It is recommended, but perhaps not mandatory, to create the environment according to the Framework documentation.
+It is recommended, but perhaps not mandatory, to create the environment
+according to the Framework [documentation](https://github.com/TENNLab-UTK/framework-open/blob/main/markdown/python_build.md):
 
 ```bash
-cat markdown/python.md
 bash scripts/create_env.sh
 source pyframework/bin/activate
 ```
@@ -106,7 +106,7 @@ pip install -e .
 Clone this repository into the requisite location (tentatively `./fpga`).
 
 ```bash
-git clone git@github.com:TENNLab-UTK/fpga.git ./fpga
+git clone https://github.com/TENNLab-UTK/fpga.git ./fpga
 cd fpga
 ```
 
